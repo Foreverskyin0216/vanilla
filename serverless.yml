@@ -1,0 +1,52 @@
+service: Vanilla
+frameworkVersion: ^3
+useDotenv: true
+
+package:
+  individually: true
+  patterns:
+    - '!node_modules/**'
+    - '.env'
+
+provider:
+  name: aws
+  region: ap-southeast-2
+
+resources:
+  Resources:
+    LineEmailParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Name: /vanilla/line/email
+        Type: String
+        Value: ${env:LINE_EMAIL}
+
+    LinePasswordParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Name: /vanilla/line/password
+        Type: String
+        Value: ${env:LINE_PASSWORD}
+
+    OpenAIApiKeyParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Name: /vanilla/openai/apiKey
+        Type: String
+        Value: ${env:OPENAI_API_KEY}
+
+    MessageTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Message
+        AttributeDefinitions:
+          - AttributeName: groupId
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: groupId
+            KeyType: HASH
+          - AttributeName: createdAt
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST

@@ -1,0 +1,15 @@
+.DS_Store
+node_modules
+
+# Env files
+.env
+.env.*
+
+# Pem files
+*.pem
+
+# Log files
+.serverless
+
+# Editor directories and files
+.vscode

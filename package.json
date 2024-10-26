@@ -1,0 +1,60 @@
+{
+  "name": "vanilla",
+  "version": "1.0.0",
+  "description": "Vanilla is a cute girl who loves to chat with you!",
+  "author": "Steve Lu",
+  "license": "MIT",
+  "scripts": {
+    "start": "npx tsx src/index.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier .",
+    "format:fix": "prettier . --write",
+    "husky:add": "chmod +x ./husky-setup.sh && ./husky-setup.sh",
+    "pre-commit": "lint-staged"
+  },
+  "dependencies": {
+    "@aws-lambda-powertools/logger": "^2.10.0",
+    "@aws-sdk/client-dynamodb": "^3.679.0",
+    "@aws-sdk/client-ssm": "^3.679.0",
+    "@aws-sdk/lib-dynamodb": "^3.679.0",
+    "@evex/linejs": "npm:@jsr/evex__linejs@^1.7.1",
+    "@langchain/community": "^0.3.9",
+    "@langchain/langgraph": "^0.2.18",
+    "@langchain/openai": "^0.3.11",
+    "cheerio": "^1.0.0",
+    "duck-duck-scrape": "^2.2.5",
+    "minimist": "^1.2.8",
+    "openai": "^4.68.4",
+    "yaml": "^2.6.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "@eslint/js": "^9.13.0",
+    "@types/eslint__js": "^8.42.3",
+    "@types/jest": "^29.5.14",
+    "@types/minimist": "^1.2.5",
+    "eslint": "^9.13.0",
+    "husky": "^9.1.6",
+    "jest": "^29.7.0",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "serverless": "^4.4.7",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.11.0"
+  },
+  "engines": {
+    "node": "^22",
+    "npm": "^10"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}
