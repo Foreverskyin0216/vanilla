@@ -1,0 +1,54 @@
+{
+  "name": "vanilla",
+  "version": "1.0.0",
+  "description": "Vanilla is a cute girl who loves to chat with you!",
+  "author": "Foreverskyin0216",
+  "license": "ISC",
+  "scripts": {
+    "start": "npx tsx src/main.ts",
+    "lint:fix": "eslint . --fix",
+    "format:fix": "prettier . --write",
+    "prepare": "[ -d '.husky' ] && husky || (mkdir .husky && husky); echo 'npx --no-install commitlint --edit $1' > .husky/commit-msg; echo 'npm run pre-commit' > .husky/pre-commit",
+    "pre-commit": "lint-staged"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.716.0",
+    "@aws-sdk/client-ssm": "^3.716.0",
+    "@aws-sdk/lib-dynamodb": "^3.716.0",
+    "@evex/linejs": "npm:@jsr/evex__linejs@^1.9.0",
+    "@langchain/community": "^0.3.19",
+    "@langchain/langgraph": "^0.2.34",
+    "@langchain/openai": "^0.3.16",
+    "cheerio": "^1.0.0",
+    "duck-duck-scrape": "^2.2.6",
+    "langchain": "^0.3.7",
+    "openai": "^4.77.0",
+    "p-queue": "^8.0.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@eslint/js": "^9.17.0",
+    "@types/aws-lambda": "^8.10.146",
+    "@types/eslint__js": "^8.42.3",
+    "dotenv": "^16.4.7",
+    "eslint": "^9.17.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.11",
+    "prettier": "^3.4.2",
+    "serverless": "^4.4.18",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1"
+  },
+  "engines": {
+    "node": "^22",
+    "npm": "^10"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}

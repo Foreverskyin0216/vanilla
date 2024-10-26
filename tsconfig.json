@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "moduleResolution": "Bundler",
+    "module": "ES2022",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "removeComments": true,
+    "sourceMap": true,
+    "target": "ES2023",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "noImplicitThis": true
+  },
+  "exclude": ["node_modules/**/*", ".serverless/**/*"],
+  "include": ["./**/*.ts"]
+}
