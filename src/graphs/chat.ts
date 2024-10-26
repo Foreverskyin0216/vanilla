@@ -2,7 +2,7 @@ import { AIMessage, HumanMessage, RemoveMessage } from '@langchain/core/messages
 import { PromptTemplate } from '@langchain/core/prompts'
 import { type RunnableConfig } from '@langchain/core/runnables'
 
-import { type MemorySaver, Annotation, StateGraph, messagesStateReducer } from '@langchain/langgraph'
+import { Annotation, StateGraph, messagesStateReducer } from '@langchain/langgraph'
 import { ToolNode } from '@langchain/langgraph/prebuilt'
 
 import { ChatOpenAI } from '@langchain/openai'
@@ -12,6 +12,7 @@ import { zodResponseFormat } from 'openai/helpers/zod'
 import { z } from 'zod'
 
 import { ADJUSTMENT_PROMPT, CHAT_PROMPT, CHAT_POSITIVE_PROMPT, CLASSIFICATION_PROMPT } from '../prompts'
+import { createDynamoDBSaver } from '../services/dynamoDB'
 import { toolkit } from '../tools/searchToolkit'
 import { summarizationGraph } from './subgraphs/summarization'
 
@@ -21,11 +22,12 @@ interface ChatState {
 }
 
 const shouldInvoke = async (_: ChatState, { configurable }: RunnableConfig) => {
+  const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
   const question = (configurable?.question ?? '') as string
 
   const openAI = new OpenAI()
   const completion = await openAI.beta.chat.completions.parse({
-    model: process.env.MODEL_NAME,
+    model: modelName,
     temperature: 0,
     messages: [
       { role: 'system', content: CLASSIFICATION_PROMPT },
@@ -40,7 +42,8 @@ const shouldInvoke = async (_: ChatState, { configurable }: RunnableConfig) => {
 
 const searchNode = async ({ messages }: ChatState, { configurable }: RunnableConfig) => {
   const question = (configurable?.question ?? '') as string
-  const openAI = new ChatOpenAI({ modelName: process.env.MODEL_NAME }).bindTools(toolkit)
+  const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
+  const openAI = new ChatOpenAI({ modelName }).bindTools(toolkit)
   const response = await openAI.invoke([new HumanMessage(question), ...messages])
   return { messages: [response] }
 }
@@ -51,10 +54,11 @@ const shouldUseSearchTools = ({ messages }: ChatState) => {
 }
 
 const chatNode = async ({ conversation }: ChatState, { configurable }: RunnableConfig) => {
-  const question = (configurable?.question ?? '') as string
   const chatMode = (configurable?.chatMode ?? 'normal') as string
+  const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
+  const question = (configurable?.question ?? '') as string
 
-  const openAI = new ChatOpenAI({ modelName: process.env.MODEL_NAME, temperature: 1 })
+  const openAI = new ChatOpenAI({ modelName, temperature: 1 })
   const prompt = new PromptTemplate({
     template: chatMode === 'positive' ? CHAT_POSITIVE_PROMPT : CHAT_PROMPT,
     inputVariables: ['context', 'question']
@@ -72,10 +76,11 @@ const chatNode = async ({ conversation }: ChatState, { configurable }: RunnableC
 }
 
 const adjustmentNode = async ({ messages }: ChatState, { configurable }: RunnableConfig) => {
-  const message = messages[messages.length - 1]
   const chatMode = (configurable?.chatMode ?? 'normal') as string
+  const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
+  const message = messages[messages.length - 1]
 
-  const openAI = new ChatOpenAI({ modelName: process.env.MODEL_NAME })
+  const openAI = new ChatOpenAI({ modelName })
   const prompt = new PromptTemplate({ template: ADJUSTMENT_PROMPT, inputVariables: ['content'] })
 
   const response = await prompt.pipe(openAI).invoke({ content: message.content })
@@ -94,11 +99,12 @@ const cleanupNode = ({ conversation, messages }: ChatState) => {
 /**
  * Get a compiled chat graph.
  */
-export const chatGraph = (checkpointer?: MemorySaver) => {
+export const chatGraph = () => {
   const annotation = Annotation.Root({
     messages: Annotation<AIMessage[]>({ reducer: messagesStateReducer }),
     conversation: Annotation<HumanMessage[]>({ reducer: messagesStateReducer })
   })
+  const checkpointer = createDynamoDBSaver()
 
   const summarizationNode = summarizationGraph().compile({ checkpointer })
 

@@ -33,7 +33,6 @@ export const setParameter = async (name: string, value: string) => {
       Type: 'SecureString',
       Overwrite: true
     })
-
     return client.send(command)
   } catch (error) {
     logger.error(error)

@@ -2,6 +2,10 @@ service: Vanilla
 frameworkVersion: ^3
 useDotenv: true
 
+plugins:
+  - serverless-esbuild
+  - serverless-iam-roles-per-function
+
 package:
   individually: true
   patterns:
@@ -11,6 +15,51 @@ package:
 provider:
   name: aws
   region: ap-southeast-2
+  runtime: nodejs20.x
+  memorySize: 512
+  timeout: 29
+  stage: v1
+  logRetentionInDays: 30
+
+  httpApi:
+    cors: true
+
+functions:
+  HandleMessage:
+    handler: src/handlers/handleMessage.handler
+    environment:
+      LINE_BOT_TOPIC: !Ref LineBotTopic
+    events:
+      - httpApi:
+          method: POST
+          path: /chat
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - sns:Publish
+        Resource: !Ref LineBotTopic
+
+  LineBot:
+    handler: src/handlers/lineBot.handler
+    timeout: 180
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - ssm:GetParameter
+        Resource:
+          - !Ref LineAccessTokenParameter
+          - !Ref OpenAIApiKeyParameter
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          - dynamodb:PutItem
+          - dynamodb:BatchWriteItem
+          - dynamodb:DeleteItem
+        Resource:
+          - !GetAtt MessageTable.Arn
+          - !GetAtt ChatConfigurationTable.Arn
+          - !GetAtt CheckpointsTable.Arn
 
 resources:
   Resources:
@@ -27,6 +76,13 @@ resources:
         Name: /vanilla/line/password
         Type: String
         Value: ${env:LINE_PASSWORD}
+
+    LineAccessTokenParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Name: /vanilla/line/accessToken
+        Type: String
+        Value: ${env:LINE_ACCESS_TOKEN}
 
     OpenAIApiKeyParameter:
       Type: AWS::SSM::Parameter
@@ -48,5 +104,49 @@ resources:
           - AttributeName: groupId
             KeyType: HASH
           - AttributeName: createdAt
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+
+    ChatConfigurationTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ChatConfiguration
+        AttributeDefinitions:
+          - AttributeName: groupId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: groupId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    CheckpointsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Checkpoints
+        AttributeDefinitions:
+          - AttributeName: thread_id
+            AttributeType: S
+          - AttributeName: checkpoint_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: thread_id
+            KeyType: HASH
+          - AttributeName: checkpoint_id
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+
+    CheckpointWritesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: CheckpointWrites
+        AttributeDefinitions:
+          - AttributeName: thread_id_checkpoint_id_checkpoint_ns
+            AttributeType: S
+          - AttributeName: task_index
+            AttributeType: S
+        KeySchema:
+          - AttributeName: thread_id_checkpoint_id_checkpoint_ns
+            KeyType: HASH
+          - AttributeName: task_index
             KeyType: RANGE
         BillingMode: PAY_PER_REQUEST

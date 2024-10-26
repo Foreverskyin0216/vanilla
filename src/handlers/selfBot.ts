@@ -1,17 +1,15 @@
 process.env.AWS_REGION = process.env.AWS_REGION || 'ap-southeast-2'
-process.env.MODEL_NAME = process.env.MODEL_NAME || 'gpt-4o-mini'
 
 import { Client } from '@evex/linejs'
 
 import { HumanMessage } from '@langchain/core/messages'
-import { MemorySaver } from '@langchain/langgraph'
-import { chatGraph } from './graphs/chat'
+import { chatGraph } from '../graphs/chat'
 
-import { storeMessage, clearMessages } from './services/dynamoDB'
-import { getParameter, setParameter } from './services/ssm'
+import { clearMessages, getConfiguration, setConfiguration, storeMessage } from '../services/dynamoDB'
+import { getParameter, setParameter } from '../services/ssm'
 
-import { logger } from './utils/logger'
-import { parseDebugCommand } from './utils/parser'
+import { logger } from '..//utils/logger'
+import { parseDebugCommand } from '../utils/parser'
 
 // Workaround for https://github.com/evex-dev/linejs/issues/45
 process.on('uncaughtException', (error) => {
@@ -21,15 +19,12 @@ process.on('uncaughtException', (error) => {
   throw error
 })
 
-class ChatBot {
+class SelfBot {
   client: Client
-  checkpointer: MemorySaver
   name: string = '香草'
-  mode: string = 'normal'
 
-  constructor(checkpointer: MemorySaver) {
+  constructor() {
     this.client = new Client()
-    this.checkpointer = checkpointer
 
     this.client.on('ready', async () => {
       const refreshToken = this.client.storage.get('refreshToken') as string
@@ -77,16 +72,28 @@ class ChatBot {
 
   private async debug(squareChatMid: string, question: string) {
     const { command, params, error } = parseDebugCommand(question)
+    if (error) {
+      return error
+    }
+
     switch (command) {
       case 'info': {
-        const text = [`聊天模式：${this.mode}`, `語言模型：${process.env.MODEL_NAME}`].join('\n')
-        await this.client.sendSquareMessage({ squareChatMid, contentType: 0, text })
+        let configuration = await getConfiguration(squareChatMid)
+        if (!configuration) {
+          await setConfiguration({ groupId: squareChatMid, chatMode: 'normal', modelName: 'gpt-4o-mini' })
+          configuration = { groupId: squareChatMid, chatMode: 'normal', modelName: 'gpt-4o-mini' }
+        }
+        const message = Object.entries(configuration)
+          .map(([key, value]) => `${key}：${value}`)
+          .join('\n')
+        await this.client.sendSquareMessage({ contentType: 0, squareChatMid, text: message })
         break
       }
 
       case 'configure': {
-        this.mode = params['chat-mode'] || 'normal'
-        process.env.MODEL_NAME = params['model'] || process.env.MODEL_NAME
+        const chatMode = params['chat-mode'] || 'normal'
+        const modelName = params['model'] || 'gpt-4o-mini'
+        await setConfiguration({ groupId: squareChatMid, chatMode, modelName })
         break
       }
 
@@ -99,7 +106,6 @@ class ChatBot {
       }
 
       case 'cleanup': {
-        this.checkpointer = new MemorySaver()
         await clearMessages(squareChatMid)
         break
       }
@@ -112,16 +118,27 @@ class ChatBot {
       }
     }
 
-    return error ? error : 'OK'
+    return 'OK'
   }
 
   private async chat(squareChatMid: string, question: string) {
     const message = new HumanMessage(question)
+    let configuration = await getConfiguration(squareChatMid)
 
-    const { conversation } = await chatGraph(this.checkpointer).invoke(
+    if (!configuration) {
+      await setConfiguration({ groupId: squareChatMid, chatMode: 'normal', modelName: 'gpt-4o-mini' })
+      configuration = { groupId: squareChatMid, chatMode: 'normal', modelName: 'gpt-4o-mini' }
+    }
+
+    const { conversation } = await chatGraph().invoke(
       { conversation: [message], messages: [message] },
       {
-        configurable: { thread_id: squareChatMid, question, chatMode: this.mode }
+        configurable: {
+          chatMode: configuration.chatMode || 'normal',
+          modelName: configuration.modelName || 'gpt-4o-mini',
+          question,
+          thread_id: squareChatMid
+        }
       }
     )
     const response = conversation[conversation.length - 1].content.toString()
@@ -146,4 +163,4 @@ class ChatBot {
   }
 }
 
-;(async () => await new ChatBot(new MemorySaver()).login())()
+;(async () => await new SelfBot().login())()

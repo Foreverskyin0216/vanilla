@@ -23,8 +23,8 @@ interface SummarizationState {
   message: AIMessage
 }
 
-const countTokens = async (documents: Document[]) => {
-  const openAI = new ChatOpenAI({ modelName: process.env.MODEL_NAME })
+const countTokens = async (documents: Document[], modelName: string = 'gpt-4o-mini') => {
+  const openAI = new ChatOpenAI({ modelName })
   let sum = 0
 
   for (const document of documents) {
@@ -45,9 +45,10 @@ const mapSummaries = ({ chatHistory }: OverallState) => {
 }
 
 const generateSummary = async ({ message }: SummarizationState, { configurable }: RunnableConfig) => {
+  const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
   const chain = RunnableSequence.from([
     new PromptTemplate({ template: MAP_PROMPT, inputVariables: ['context', 'requirements'] }),
-    new ChatOpenAI({ modelName: process.env.MODEL_NAME, temperature: 0 }),
+    new ChatOpenAI({ modelName }),
     new StringOutputParser()
   ])
   const requirements = (configurable?.question ?? '') as string
@@ -64,9 +65,10 @@ const collectSummaries = ({ summaries }: OverallState) => {
 }
 
 const collapseSummaries = async (state: OverallState, { configurable }: RunnableConfig) => {
+  const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
   const chain = RunnableSequence.from([
     new PromptTemplate({ template: REDUCE_PROMPT, inputVariables: ['docs', 'requirements'] }),
-    new ChatOpenAI({ modelName: process.env.MODEL_NAME, temperature: 0 }),
+    new ChatOpenAI({ modelName }),
     new StringOutputParser()
   ])
   const requirements = (configurable?.question ?? '') as string
@@ -90,9 +92,10 @@ const shouldCollapse = async ({ collapsedSummaries }: OverallState) => {
 }
 
 const generateFinalSummary = async (state: OverallState, { configurable }: RunnableConfig) => {
+  const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
   const chain = RunnableSequence.from([
     new PromptTemplate({ template: REDUCE_PROMPT, inputVariables: ['docs', 'requirements'] }),
-    new ChatOpenAI({ modelName: process.env.MODEL_NAME, temperature: 0 }),
+    new ChatOpenAI({ modelName, temperature: 0 }),
     new StringOutputParser()
   ])
   const requirements = (configurable?.question ?? '') as string

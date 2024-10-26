@@ -24,11 +24,12 @@ import { SEARCH_PROMPT, RETRIEVAL_PROMPT } from '../prompts'
 export const toolkit = [
   tool(
     async (_, { configurable }: RunnableConfig) => {
+      const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
       const question = (configurable?.question ?? '') as string
 
       const openAI = new OpenAI()
       const completion = await openAI.beta.chat.completions.parse({
-        model: process.env.MODEL_NAME,
+        model: modelName,
         temperature: 0,
         messages: [
           { role: 'system', content: SEARCH_PROMPT },
@@ -52,22 +53,21 @@ export const toolkit = [
 
   tool(
     async ({ link }, { configurable }: RunnableConfig) => {
+      const modelName = (configurable?.modelName ?? 'gpt-4o-mini') as string
       const question = (configurable?.question ?? '') as string
 
       const loader = new CheerioWebBaseLoader(link)
       const docs = await loader.load()
       const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 })
       const store = await MemoryVectorStore.fromDocuments(await splitter.splitDocuments(docs), new OpenAIEmbeddings())
-      const retriever = store.asRetriever()
 
-      const openAI = new ChatOpenAI({ modelName: process.env.MODEL_NAME, temperature: 0 })
       const chain = await createStuffDocumentsChain({
-        llm: openAI,
+        llm: new ChatOpenAI({ modelName }),
         outputParser: new StringOutputParser(),
         prompt: new PromptTemplate({ template: RETRIEVAL_PROMPT, inputVariables: ['question', 'context'] })
       })
 
-      const retrieved = await retriever.invoke(question)
+      const retrieved = await store.asRetriever().invoke(question)
       const result = await chain.invoke({ question, context: retrieved })
 
       return `Answer: ${result}`
