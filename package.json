@@ -2,16 +2,19 @@
   "name": "vanilla",
   "version": "1.0.0",
   "description": "Vanilla is a cute girl who loves to chat with you!",
-  "author": "Steve Lu",
+  "author": "Foreverskyin0216",
   "license": "MIT",
   "scripts": {
     "start": "npx tsx src/index.ts",
+    "test": "export POWERTOOLS_DEV=true && npm run test:coverage -- --passWithNoTests",
+    "test:coverage": "jest --coverage --silent",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier .",
     "format:fix": "prettier . --write",
     "husky:add": "chmod +x ./husky-setup.sh && ./husky-setup.sh",
-    "pre-commit": "lint-staged"
+    "pre-commit": "lint-staged",
+    "pre-push": "npm run test"
   },
   "dependencies": {
     "@aws-lambda-powertools/logger": "^2.10.0",
@@ -19,7 +22,7 @@
     "@aws-sdk/client-ssm": "^3.679.0",
     "@aws-sdk/lib-dynamodb": "^3.679.0",
     "@evex/linejs": "npm:@jsr/evex__linejs@^1.7.1",
-    "@langchain/community": "^0.3.9",
+    "@langchain/community": "^0.3.10",
     "@langchain/langgraph": "^0.2.18",
     "@langchain/openai": "^0.3.11",
     "cheerio": "^1.0.0",

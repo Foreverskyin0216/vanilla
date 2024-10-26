@@ -16,5 +16,5 @@
     "noImplicitThis": true
   },
   "exclude": ["node_modules/**/*", ".serverless/**/*"],
-  "include": ["./**/*.ts", "eslint.config.cjs"]
+  "include": ["./**/*.ts"]
 }
