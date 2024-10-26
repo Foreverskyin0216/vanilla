@@ -1,0 +1,22 @@
+# MacOS files
+.DS_Store
+
+# packages
+node_modules
+
+# Test artifacts
+coverage
+
+# Secret files
+secrets.json
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Keys
+*.pem
+
+# Editor configuration
+.vscode
