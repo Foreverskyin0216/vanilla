@@ -5,6 +5,14 @@ useDotenv: true
 plugins:
   - serverless-esbuild
   - serverless-iam-roles-per-function
+  - serverless-scriptable-plugin
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+    target: node20
 
 package:
   individually: true
@@ -42,6 +50,9 @@ functions:
   LineBot:
     handler: src/handlers/lineBot.handler
     timeout: 180
+    package:
+      include:
+        - src/utils/debug-commands.yml
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -63,6 +74,67 @@ functions:
 
 resources:
   Resources:
+    SelfBotInstance:
+      Type: AWS::EC2::Instance
+      Properties:
+        ImageId: ami-040e71e7b8391cae4
+        InstanceType: t2.micro
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            sudo apt update
+            sudo apt install git -y
+            git clone https://github.com/Foreverskyin0216/Vanilla.git /home/ubuntu/Vanilla
+            cd /home/ubuntu/Vanilla
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+            source ~/.nvm/nvm.sh
+            nvm install 22
+            npm install
+            nohup npm run start > vanilla.log &
+
+    SelfBotSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: SelfBotSecurityGroup
+
+    SelfBotProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        Roles:
+          - Ref: SelfBotRole
+
+    SelfBotRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: ec2.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: SelfBotPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ssm:GetParameter
+                    - ssm:PutParameter
+                  Resource: arn:aws:ssm:${self:provider.region}:${AWS::AccountId}:parameter/vanilla/*
+                - Effect: Allow
+                  Action:
+                    - dynamodb:GetItem
+                    - dynamodb:Query
+                    - dynamodb:PutItem
+                    - dynamodb:BatchWriteItem
+                    - dynamodb:DeleteItem
+                  Resource:
+                    - !GetAtt MessageTable.Arn
+                    - !GetAtt ChatConfigurationTable.Arn
+                    - !GetAtt CheckpointsTable.Arn
+
     LineEmailParameter:
       Type: AWS::SSM::Parameter
       Properties:
@@ -80,9 +152,9 @@ resources:
     LineAccessTokenParameter:
       Type: AWS::SSM::Parameter
       Properties:
-        Name: /vanilla/line/accessToken
+        Name: /vanilla/line/channelAccessToken
         Type: String
-        Value: ${env:LINE_ACCESS_TOKEN}
+        Value: ${env:LINE_CHANNEL_ACCESS_TOKEN}
 
     OpenAIApiKeyParameter:
       Type: AWS::SSM::Parameter

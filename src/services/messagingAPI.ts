@@ -7,7 +7,7 @@ export type Message = messagingApi.ImageMessage | messagingApi.TextMessage
 export const reply = async (replyToken: string, messages: Message[]) => {
   try {
     const client = new messagingApi.MessagingApiClient({
-      channelAccessToken: await getParameter('/vanilla/line/accessToken')
+      channelAccessToken: await getParameter('/vanilla/line/channelAccessToken')
     })
     return client.replyMessage({ replyToken, messages })
   } catch (error) {
@@ -19,7 +19,7 @@ export const reply = async (replyToken: string, messages: Message[]) => {
 export const getProfile = async (groupId: string, userId: string) => {
   try {
     const client = new messagingApi.MessagingApiClient({
-      channelAccessToken: await getParameter('/vanilla/line/accessToken')
+      channelAccessToken: await getParameter('/vanilla/line/channelAccessToken')
     })
     return client.getGroupMemberProfile(groupId, userId)
   } catch (error) {

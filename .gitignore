@@ -1,16 +1,21 @@
+# MacOS files
 .DS_Store
+
+# packages
 node_modules
+
+# Test artifacts
 coverage
 
-# Env files
+# Environment variables
 .env
 .env.*
 
-# Pem files
+# Keys
 *.pem
 
-# Log files
+# Serverless artifacts
 .serverless
 
-# Editor directories and files
+# Editor configuration
 .vscode

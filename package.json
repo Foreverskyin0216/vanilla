@@ -5,7 +5,7 @@
   "author": "Foreverskyin0216",
   "license": "ISC",
   "scripts": {
-    "start": "npx tsx src/index.ts",
+    "start": "npx tsx src/handlers/selfBot.ts",
     "test": "export POWERTOOLS_DEV=true && npm run test:coverage -- --passWithNoTests",
     "test:coverage": "jest --coverage --silent",
     "lint": "eslint .",
