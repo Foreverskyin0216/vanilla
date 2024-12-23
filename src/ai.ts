@@ -21,7 +21,7 @@ export const createThread = async () => new OpenAI().beta.threads.create()
 
 export const classify = async (question: string) => {
   const openai = new ChatOpenAI({ model: 'gpt-4o-mini', temperature: 0 })
-  const schema = z.object({ intent: z.enum(['summarization', 'search', 'chat']) })
+  const schema = z.object({ intent: z.enum(['summarization', 'tools', 'chat']) })
   return openai.withStructuredOutput(schema).invoke([
     { role: 'system', content: classification },
     { role: 'user', content: question }

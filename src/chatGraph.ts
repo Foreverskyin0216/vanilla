@@ -11,7 +11,8 @@ import { summarizationGraph } from './summarizationGraph'
 
 const ChatState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({ reducer: messagesStateReducer }),
-  response: Annotation<string>
+  response: Annotation<string>,
+  reference: Annotation<string>
 })
 
 export const shouldInvoke = async ({ messages }: typeof ChatState.State) => {
@@ -19,23 +20,24 @@ export const shouldInvoke = async ({ messages }: typeof ChatState.State) => {
   return intent
 }
 
-export const searchNode = async ({ messages }: typeof ChatState.State) => {
+export const toolsNode = async ({ messages }: typeof ChatState.State) => {
   return { messages: [await useTools(toolkit, messages)] }
 }
 
-export const shouldUseSearchTools = ({ messages }: typeof ChatState.State) => {
+export const shouldUseTools = ({ messages }: typeof ChatState.State) => {
   const message = messages[messages.length - 1] as AIMessage
-  return message?.tool_calls?.length > 0 ? 'searchTools' : 'chat'
+  return message?.tool_calls?.length > 0 ? 'toolkit' : 'chat'
 }
 
 export const chatNode = async ({ messages }: typeof ChatState.State, { configurable }: Config) => {
   const question = messages[0]
   const response = messages[messages.length - 1].getType() === 'ai' ? messages[messages.length - 1] : undefined
   const result = await chat(configurable.conversation_id, question, response)
-  return { messages: [], response: result }
+  return { messages: [], response: result, reference: process.env.REFERENCED_URL }
 }
 
 export const cleanupNode = ({ messages }: typeof ChatState.State) => {
+  delete process.env.REFERENCED_URL
   return { messages: messages.map(({ id }) => new RemoveMessage({ id })) }
 }
 
@@ -45,14 +47,14 @@ export const cleanupNode = ({ messages }: typeof ChatState.State) => {
 export const chatGraph = (checkpointer: MemorySaver) =>
   new StateGraph(ChatState)
     .addNode('summarization', summarizationGraph(checkpointer))
-    .addNode('search', searchNode)
+    .addNode('tools', toolsNode)
     .addNode('chat', chatNode)
     .addNode('cleanup', cleanupNode)
-    .addNode('searchTools', new ToolNode(toolkit))
-    .addConditionalEdges('__start__', shouldInvoke, ['summarization', 'search', 'chat'])
+    .addNode('toolkit', new ToolNode(toolkit))
+    .addConditionalEdges('__start__', shouldInvoke, ['summarization', 'tools', 'chat'])
     .addEdge('summarization', 'chat')
-    .addConditionalEdges('search', shouldUseSearchTools, ['searchTools', 'chat'])
-    .addEdge('searchTools', 'search')
+    .addConditionalEdges('tools', shouldUseTools, ['toolkit', 'chat'])
+    .addEdge('toolkit', 'tools')
     .addEdge('chat', 'cleanup')
     .addEdge('cleanup', '__end__')
     .compile({ checkpointer })
