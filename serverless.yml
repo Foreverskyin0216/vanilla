@@ -2,17 +2,6 @@ service: Vanilla
 frameworkVersion: ^3
 useDotenv: true
 
-plugins:
-  - serverless-esbuild
-  - serverless-iam-roles-per-function
-
-custom:
-  esbuild:
-    bundle: true
-    minify: true
-    sourcemap: false
-    target: node20
-
 package:
   individually: true
   patterns:
@@ -21,76 +10,11 @@ package:
 provider:
   name: aws
   region: ap-southeast-2
-  runtime: nodejs18.x
-  memorySize: 512
-  timeout: 29
   stage: v1
-  logRetentionInDays: 30
   profile: ${env:AWS_PROFILE, 'default'}
-
-  httpApi:
-    cors: true
-
-functions:
-  HandleMessage:
-    handler: src/handlers/handleMessage.handler
-    environment:
-      LINE_BOT_TOPIC: !Ref LineBotTopic
-    events:
-      - httpApi:
-          method: POST
-          path: /chat
-    iamRoleStatements:
-      - Effect: Allow
-        Action:
-          - sns:Publish
-        Resource: !Ref LineBotTopic
-
-  LineBot:
-    handler: src/handlers/lineBot.handler
-    timeout: 180
-    iamRoleStatements:
-      - Effect: Allow
-        Action:
-          - ssm:GetParameter
-        Resource:
-          - !Sub arn:aws:ssm:${self:provider.region}:${AWS::AccountId}:parameter/vanilla/*
-      - Effect: Allow
-        Action:
-          - dynamodb:GetItem
-          - dynamodb:Query
-          - dynamodb:PutItem
-          - dynamodb:BatchWriteItem
-          - dynamodb:DeleteItem
-        Resource:
-          - !GetAtt MessageTable.Arn
-          - !GetAtt ChatConfigurationTable.Arn
-          - !GetAtt CheckpointsTable.Arn
-          - !GetAtt CheckpointWritesTable.Arn
 
 resources:
   Resources:
-    LineBotTopic:
-      Type: AWS::SNS::Topic
-      Properties:
-        TopicName: lintbot-topic
-
-    LintBotSnsSubscription:
-      Type: AWS::SNS::Subscription
-      Properties:
-        TopicArn:
-          Ref: LineBotTopic
-        Protocol: lambda
-        Endpoint: !GetAtt LineBotLambdaFunction.Arn
-
-    LineBotSnsPermission:
-      Type: AWS::Lambda::Permission
-      Properties:
-        Action: lambda:InvokeFunction
-        FunctionName: !GetAtt LineBotLambdaFunction.Arn
-        Principal: sns.amazonaws.com
-        SourceArn: !Ref LineBotTopic
-
     LineEmailParameter:
       Type: AWS::SSM::Parameter
       Properties:
@@ -105,19 +29,26 @@ resources:
         Type: String
         Value: ${env:LINE_PASSWORD}
 
-    LineChannelAccessTokenParameter:
-      Type: AWS::SSM::Parameter
-      Properties:
-        Name: /vanilla/line/channelAccessToken
-        Type: String
-        Value: ${env:LINE_CHANNEL_ACCESS_TOKEN}
-
     OpenAIApiKeyParameter:
       Type: AWS::SSM::Parameter
       Properties:
         Name: /vanilla/openai/apiKey
         Type: String
         Value: ${env:OPENAI_API_KEY}
+
+    OpenAIBaseUrlParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Name: /vanilla/openai/baseUrl
+        Type: String
+        Value: ${env:OPENAI_BASE_URL}
+
+    TavilyApiKeyParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Name: /vanilla/tavily/apiKey
+        Type: String
+        Value: ${env:TAVILY_API_KEY}
 
     MessageTable:
       Type: AWS::DynamoDB::Table
@@ -135,46 +66,14 @@ resources:
             KeyType: RANGE
         BillingMode: PAY_PER_REQUEST
 
-    ChatConfigurationTable:
+    ThreadTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ChatConfiguration
+        TableName: Thread
         AttributeDefinitions:
-          - AttributeName: thread_id
+          - AttributeName: id
             AttributeType: S
         KeySchema:
-          - AttributeName: thread_id
+          - AttributeName: id
             KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-
-    CheckpointsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: Checkpoint
-        AttributeDefinitions:
-          - AttributeName: thread_id
-            AttributeType: S
-          - AttributeName: checkpoint_id
-            AttributeType: S
-        KeySchema:
-          - AttributeName: thread_id
-            KeyType: HASH
-          - AttributeName: checkpoint_id
-            KeyType: RANGE
-        BillingMode: PAY_PER_REQUEST
-
-    CheckpointWritesTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: CheckpointWrite
-        AttributeDefinitions:
-          - AttributeName: thread_id_checkpoint_id_checkpoint_ns
-            AttributeType: S
-          - AttributeName: task_index
-            AttributeType: S
-        KeySchema:
-          - AttributeName: thread_id_checkpoint_id_checkpoint_ns
-            KeyType: HASH
-          - AttributeName: task_index
-            KeyType: RANGE
         BillingMode: PAY_PER_REQUEST
