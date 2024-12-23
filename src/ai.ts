@@ -38,7 +38,7 @@ export const chat = async (threadId: string, humanMessage: BaseMessage, aiMessag
   const answer = aiMessage?.content?.toString()
   const assistant = await openai.assistants.create({
     instructions: botPersonality,
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     tools: [{ type: 'code_interpreter' }]
   })
   if (answer) {

@@ -19,7 +19,6 @@ export class Vanilla {
 
     this.client.on('ready', async () => {
       process.env.OPENAI_API_KEY = await getParameter('/vanilla/openai/apiKey')
-      process.env.OPENAI_BASE_URL = await getParameter('/vanilla/openai/baseUrl')
       process.env.TAVILY_API_KEY = await getParameter('/vanilla/tavily/apiKey')
     })
 
@@ -40,7 +39,7 @@ export class Vanilla {
             }
           }
         } catch (err) {
-          await Promise.all([react(6), reply(err.message)])
+          await Promise.all([react(6), reply(`${err}`)])
         }
       }
     )
