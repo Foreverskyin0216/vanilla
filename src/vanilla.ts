@@ -61,7 +61,7 @@ export class Vanilla {
       }
     )
 
-    return response + (reference ? '\n\n參考來源：' + reference : '')
+    return (response + (reference ? '\n\n參考來源：' + reference : '')).replace(this.name + '：', '')
   }
 
   public async login() {
