@@ -28,7 +28,7 @@ export class Vanilla {
     })
   }
 
-  private async respond({ author, content, contentMetadata, contentType, squareChatMid, react, reply }) {
+  private async respond({ author, content, contentMetadata, contentType, squareChatMid, reply }) {
     try {
       if (contentType === 'NONE' && content) {
         const user = await author.displayName
@@ -41,7 +41,7 @@ export class Vanilla {
         }
       }
     } catch (err) {
-      await Promise.all([react(6), reply(err.message)])
+      console.log(err)
     }
   }
 
