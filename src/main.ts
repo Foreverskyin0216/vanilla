@@ -7,4 +7,4 @@ process.on('uncaughtException', (error) => {
   if (error.name === 'InputBufferUnderrunError') console.error('InputBufferUnderrunError')
   else throw error
 })
-;(async () => await new Vanilla().login())()
+;(async () => await new Vanilla('vanilla').login())()
