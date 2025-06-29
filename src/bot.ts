@@ -72,30 +72,35 @@ export class ChatBot {
   }
 
   private async _chat(event: SquareMessage) {
-    const message = event.raw.message
+    try {
+      const message = event.raw.message
 
-    this._addSquare(message)
-    await this._addMember(message)
-    this._addMessage(message)
+      this._addSquare(message)
+      await this._addMember(message)
+      this._addMessage(message)
 
-    const isBotReply = await event.isMyMessage()
-    if (isBotReply) {
-      return
+      const isBotReply = await event.isMyMessage()
+      if (isBotReply) {
+        return
+      }
+
+      if (!this._isMentioned(message) && !this._isReply(message)) {
+        return
+      }
+
+      const square = this.botStatus[message.to]
+
+      const { messages } = await this.app.invoke(
+        { messages: square.conversation },
+        { configurable: { ai: this.ai, search: this.search, square } as AppConfig }
+      )
+
+      const answer = messages[messages.length - 1].content.toString()
+      await event.reply({ text: answer, relatedMessageId: message.id })
+    } catch (error) {
+      console.error(error)
+      await event.react(6)
     }
-
-    if (!this._isMentioned(message) && !this._isReply(message)) {
-      return
-    }
-
-    const square = this.botStatus[message.to]
-
-    const { messages } = await this.app.invoke(
-      { messages: square.conversation },
-      { configurable: { ai: this.ai, search: this.search, square } as AppConfig }
-    )
-
-    const answer = messages[messages.length - 1].content.toString()
-    await event.reply({ text: answer, relatedMessageId: message.id })
   }
 
   private async _getMember(message: SquareMessage['raw']['message']) {
