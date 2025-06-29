@@ -13,6 +13,7 @@ secrets.json
 # Environment variables
 .env
 .env.*
+!.env.example
 
 # Keys
 *.pem
