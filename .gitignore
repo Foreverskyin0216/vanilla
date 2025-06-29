@@ -7,15 +7,15 @@ node_modules
 # Test artifacts
 coverage
 
+# Secret files
+secrets.json
+
 # Environment variables
 .env
 .env.*
 
 # Keys
 *.pem
-
-# Serverless artifacts
-.serverless
 
 # Editor configuration
 .vscode

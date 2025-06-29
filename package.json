@@ -12,35 +12,26 @@
     "pre-commit": "lint-staged"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.716.0",
-    "@aws-sdk/client-ssm": "^3.716.0",
-    "@aws-sdk/lib-dynamodb": "^3.716.0",
-    "@evex/linejs": "npm:@jsr/evex__linejs@^1.9.0",
-    "@langchain/community": "^0.3.19",
-    "@langchain/langgraph": "^0.2.34",
-    "@langchain/openai": "^0.3.16",
-    "cheerio": "^1.0.0",
-    "langchain": "^0.3.7",
-    "openai": "^4.77.0",
-    "p-queue": "^8.0.1",
-    "zod": "^3.24.1"
+    "@evex/linejs": "npm:@jsr/evex__linejs@^2.1.7",
+    "@langchain/core": "^0.3.61",
+    "@langchain/langgraph": "^0.3.5",
+    "@langchain/openai": "^0.5.16",
+    "@tavily/core": "^0.5.8",
+    "cheerio": "^1.1.0",
+    "langchain": "^0.3.29",
+    "zod": "^3.25.67"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.6.1",
-    "@commitlint/config-conventional": "^19.6.0",
-    "@eslint/js": "^9.17.0",
-    "@types/eslint__js": "^8.42.3",
-    "dotenv": "^16.4.7",
-    "eslint": "^9.17.0",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.30.0",
+    "dotenv": "^17.0.0",
+    "eslint": "^9.30.0",
     "husky": "^9.1.7",
-    "lint-staged": "^15.2.11",
-    "prettier": "^3.4.2",
-    "serverless": "^4.4.18",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "^8.18.1"
-  },
-  "engines": {
-    "node": "^22"
+    "lint-staged": "^16.1.2",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.35.0"
   },
   "lint-staged": {
     "*.ts": [

@@ -1,46 +1,69 @@
-import { TavilySearchResults } from '@langchain/community/tools/tavily_search'
-import { tool } from '@langchain/core/tools'
-import { z } from 'zod'
-import { retrieveInfoFromWebPage } from './ai'
-import { clearMessages, clearThread } from './dynamoDB'
+import type { BaseMessage } from '@langchain/core/messages'
+import type { DynamicStructuredTool } from '@langchain/core/tools'
+import type { AppConfig } from './types'
 
-/**
- * Tools for searching and retrieving information from the web
- */
-export const toolkit = [
-  tool(
-    async ({ question }) => {
-      try {
-        const { content } = await new TavilySearchResults({ maxResults: 1 }).invoke(question)
-        const link = JSON.parse(content)[0].url
-        process.env.REFERENCED_URL = link
-        return 'Answer: ' + (await retrieveInfoFromWebPage(link, question))
-      } catch {
-        return '這個問題太難了，無法找到答案'
-      }
+import { SystemMessage, HumanMessage, ToolMessage } from '@langchain/core/messages'
+import { tool } from '@langchain/core/tools'
+import { Command } from '@langchain/langgraph'
+import { z } from 'zod'
+
+import * as prompts from './prompts'
+
+export const tools = {
+  websearch: tool(
+    async ({ question }, { configurable, toolCall }) => {
+      const tavily = configurable['search'] as AppConfig['search']
+      const answer = await tavily.search(question)
+      return new Command({
+        goto: 'handleMessages',
+        update: { messages: [new ToolMessage({ content: answer, tool_call_id: toolCall.id })] }
+      })
     },
     {
-      name: 'DuckDuckGoSearch',
-      description: '當用戶想要任何資訊時，使用此工具來搜索資訊',
-      schema: z.object({ question: z.string().describe('用戶的問題，如果不夠清晰，再自行添加更詳細的補充用於搜索') })
+      name: 'websearch',
+      description: 'Search the web for information. Use this tool to find up-to-date information on various topics.',
+      schema: z.object({ question: z.string().describe('The question or topic to search for on the web.') })
     }
   ),
 
-  tool(
-    async (_, { configurable }) => {
-      try {
-        const thread_id = configurable.thread_id
-        await clearMessages(thread_id)
-        await clearThread(thread_id)
-        return '已經清除了所有訊息'
-      } catch {
-        return '無法清除訊息'
+  reply: tool(
+    async ({ type }, { configurable, toolCall }) => {
+      const { ai, square } = configurable as AppConfig
+      const question = square.conversation[square.conversation.length - 1].content.toString()
+      const messages: BaseMessage[] = []
+
+      if (type === 'member') {
+        const members = square['members']
+
+        const input = [new SystemMessage(prompts.MEMBER_IDENTIFICATION_PROMPT), new HumanMessage(question)]
+        const { name } = await ai.getStructuredOutput(
+          input,
+          z.object({ name: z.enum(Object.values(members).map((member) => member.name) as [string]) })
+        )
+
+        messages.push(...members[name].messages.map((m) => m.content))
+        messages.push(new HumanMessage(question))
+      } else {
+        const conversation = square.conversation
+        messages.push(...conversation)
       }
+
+      const input = [new SystemMessage(prompts.SUMMARIZATION_PROMPT), ...messages]
+      const response = await ai.chat(input)
+
+      return new Command({
+        goto: 'handleMessages',
+        update: { messages: [new ToolMessage({ content: response.content, tool_call_id: toolCall.id })] }
+      })
     },
     {
-      name: 'EraseMemory',
-      description: '用於刪除記憶',
-      schema: z.object({})
+      name: 'summary',
+      description: 'Summarize the messages from the conversation or a specific member.',
+      schema: z.object({
+        type: z
+          .enum(['conversation', 'member'])
+          .describe('Type of summary to generate: conversation or memberuser-specific.')
+      })
     }
   )
-]
+} as unknown as { [key: string]: DynamicStructuredTool }

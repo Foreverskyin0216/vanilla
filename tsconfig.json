@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
-    "lib": ["ES2023"],
+    "lib": ["ESNext"],
     "moduleResolution": "Bundler",
-    "module": "ES2022",
+    "module": "ESNext",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "removeComments": true,
     "sourceMap": true,
-    "target": "ES2023",
+    "target": "ESNext",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
