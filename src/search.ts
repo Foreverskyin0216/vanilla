@@ -21,4 +21,15 @@ export class Search {
     })
     return answer
   }
+
+  public async extract(url: string) {
+    const { results } = await this.client.extract([url])
+
+    const result = results.find((result) => result.url === url)
+    if (!result) {
+      return ''
+    }
+
+    return result.rawContent
+  }
 }

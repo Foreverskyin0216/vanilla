@@ -11,9 +11,10 @@ import * as prompts from './prompts'
 
 export const tools = {
   websearch: tool(
-    async ({ question }, { configurable, toolCall }) => {
+    async ({ question, searchType }, { configurable, toolCall }) => {
       const tavily = configurable['search'] as AppConfig['search']
-      const answer = await tavily.search(question)
+
+      const answer = searchType === 'search' ? await tavily.search(question) : await tavily.extract(question)
       return new Command({
         goto: 'handleMessages',
         update: { messages: [new ToolMessage({ content: answer, tool_call_id: toolCall.id })] }
@@ -22,7 +23,18 @@ export const tools = {
     {
       name: 'websearch',
       description: 'Search the web for information. Use this tool to find up-to-date information on various topics.',
-      schema: z.object({ question: z.string().describe('The question or topic to search for on the web.') })
+      schema: z.object({
+        question: z
+          .string()
+          .describe(
+            'If searchType is search, the question or topic to search for on the web; if searchType is extract, the url to extract the content from.'
+          ),
+        searchType: z
+          .enum(['search', 'extract'])
+          .describe(
+            'The type of search to perform. search for general information, extract the page content from the url.'
+          )
+      })
     }
   ),
 
