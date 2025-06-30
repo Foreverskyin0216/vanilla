@@ -74,6 +74,9 @@ export class ChatBot {
   private async _chat(event: SquareMessage) {
     try {
       const message = event.raw.message
+      if (message.contentType !== 0) {
+        return
+      }
 
       this._addSquare(message)
       await this._addMember(message)
