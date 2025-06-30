@@ -30,12 +30,13 @@ export class ChatBot {
   private async _addMember(message: SquareMessage['raw']['message']) {
     const squareChatId = message.to
     const memberId = message.from
+    const member = await this._getMember(message)
 
-    if (message.from in this.botStatus[squareChatId].members) {
+    if (memberId in this.botStatus[squareChatId].members) {
+      this.botStatus[squareChatId].members[memberId].name = member.displayName
       return
     }
 
-    const member = await this._getMember(message)
     this.botStatus[squareChatId].members[memberId] = { name: member.displayName, messages: [] }
 
     if (member.displayName === this.botName) {
