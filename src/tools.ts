@@ -38,10 +38,17 @@ export const tools = {
         const input = [new SystemMessage(prompts.MEMBER_IDENTIFICATION_PROMPT), new HumanMessage(question)]
         const { name } = await ai.getStructuredOutput(
           input,
-          z.object({ name: z.enum(Object.values(members).map((member) => member.name) as [string]) })
+          z.object({ name: z.enum(Object.values(members).map((member) => member.name) as [string]) }),
+          'o3-mini'
         )
 
-        messages.push(...members[name].messages.map((m) => m.content))
+        messages.push(
+          ...Object.values(members)
+            .filter((member) => member.name === name)
+            .map((m) => m.messages)
+            .flat()
+            .map((m) => m.content)
+        )
         messages.push(new HumanMessage(question))
       } else {
         const conversation = square.conversation

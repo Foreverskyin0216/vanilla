@@ -51,7 +51,7 @@ export class ChatBot {
     const content = new HumanMessage(`${member}: ${message.text.replaceAll('@' + this.botName, '').trim()}`)
 
     const conversation = this.botStatus[squareChatId].conversation
-    conversation.push(new HumanMessage(message.text))
+    conversation.push(content)
     if (conversation.length > 100) {
       conversation.shift()
     }
