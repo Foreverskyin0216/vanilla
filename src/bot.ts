@@ -75,7 +75,7 @@ export class ChatBot {
   private async _chat(event: SquareMessage) {
     try {
       const message = event.raw.message
-      if (message.contentType !== 0) {
+      if (message.contentType !== 'NONE') {
         return
       }
 
