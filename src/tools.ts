@@ -46,8 +46,7 @@ export const tools = {
         const input = [new SystemMessage(prompts.MEMBER_IDENTIFICATION_PROMPT), new HumanMessage(question)]
         const { name } = await ai.getStructuredOutput(
           input,
-          z.object({ name: z.enum(Object.values(members).map((member) => member.name) as [string]) }),
-          'o3-mini'
+          z.object({ name: z.enum(Object.values(members).map((member) => member.name) as [string]) })
         )
 
         messages.push(
@@ -57,18 +56,16 @@ export const tools = {
             .flat()
             .map((m) => m.content)
         )
-        messages.push(new HumanMessage(question))
       } else {
         const conversation = square.conversation
         messages.push(...conversation)
       }
 
-      const input = [new SystemMessage(prompts.SUMMARIZATION_PROMPT), ...messages]
-      const response = await ai.chat(input)
+      const { content } = await ai.chat([new SystemMessage(prompts.SUMMARIZATION_PROMPT), ...messages])
 
       return new Command({
         goto: 'handleMessages',
-        update: { messages: [new ToolMessage({ content: response.content, tool_call_id: toolCall.id })] }
+        update: { messages: [new ToolMessage({ content, tool_call_id: toolCall.id })] }
       })
     },
     {
