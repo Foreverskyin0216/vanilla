@@ -94,13 +94,24 @@ export class ChatBot {
 
       const square = this.botStatus[message.to]
 
-      const { messages } = await this.app.invoke(
-        { messages: square.conversation },
-        { configurable: { ai: this.ai, search: this.search, square } as AppConfig }
+      const { messages, reaction } = await this.app.invoke(
+        {
+          messages: square.conversation,
+          reaction: 0
+        },
+        {
+          configurable: { ai: this.ai, search: this.search, square } as AppConfig
+        }
       )
 
+      if (reaction > 1) {
+        await event.react(reaction)
+      }
+
       const answer = messages[messages.length - 1].content.toString()
-      await event.reply({ text: answer, relatedMessageId: message.id })
+      if (answer && !answer.includes('[debug]')) {
+        await event.reply({ text: answer.replaceAll(`${this.botName}: `, ''), relatedMessageId: message.id })
+      }
     } catch (error) {
       console.error(error)
       await event.react(6)

@@ -11,10 +11,10 @@ import * as prompts from './prompts'
 
 export const tools = {
   websearch: tool(
-    async ({ question, searchType }, { configurable, toolCall }) => {
+    async ({ question, timeRange }, { configurable, toolCall }) => {
       const tavily = configurable['search'] as AppConfig['search']
 
-      const answer = searchType === 'search' ? await tavily.search(question) : await tavily.extract(question)
+      const answer = await tavily.search(question, timeRange)
       return new Command({
         goto: 'handleMessages',
         update: { messages: [new ToolMessage({ content: answer, tool_call_id: toolCall.id })] }
@@ -29,16 +29,12 @@ export const tools = {
           .describe(
             'If searchType is search, the question or topic to search for on the web; if searchType is extract, the url to extract the content from.'
           ),
-        searchType: z
-          .enum(['search', 'extract'])
-          .describe(
-            'The type of search to perform. search for general information, extract the page content from the url.'
-          )
+        timeRange: z.enum(['day', 'week', 'month', 'year']).describe('The time range to search for.')
       })
     }
   ),
 
-  reply: tool(
+  summary: tool(
     async ({ type }, { configurable, toolCall }) => {
       const { ai, square } = configurable as AppConfig
       const question = square.conversation[square.conversation.length - 1].content.toString()
@@ -82,6 +78,58 @@ export const tools = {
         type: z
           .enum(['conversation', 'member'])
           .describe('Type of summary to generate: conversation or memberuser-specific.')
+      })
+    }
+  ),
+
+  react: tool(
+    async ({ reaction, reason }, { toolCall }) => {
+      return new Command({
+        goto: 'handleMessages',
+        update: {
+          reaction: Number(reaction),
+          messages: [new ToolMessage({ content: reason, tool_call_id: toolCall.id })]
+        }
+      })
+    },
+    {
+      name: 'react',
+      description: `Choose a appropriate reaction code to react to the message.
+        - 2: NICE
+        - 3: LOVE
+        - 4: FUN
+        - 5: AMAZING
+        - 6: SAD
+        - 7: OMG
+      `,
+      schema: z.object({
+        reaction: z.enum(['2', '3', '4', '5', '6', '7']).describe('The reaction code to react to the message.'),
+        reason: z.string().describe('The reason for the reaction.')
+      })
+    }
+  ),
+
+  debug: tool(
+    async ({ type }, { configurable, toolCall }) => {
+      const { square } = configurable as AppConfig
+      if (type === 'clear') {
+        square.conversation = []
+        square.members = {}
+      }
+
+      return new Command({
+        goto: 'handleMessages',
+        update: {
+          messages: [new ToolMessage({ content: '[debug] Cleared', tool_call_id: toolCall.id })],
+          reaction: 2
+        }
+      })
+    },
+    {
+      name: 'debug',
+      description: 'Choose a appropriate debug tool to answer the question.',
+      schema: z.object({
+        type: z.enum(['clear'])
       })
     }
   )

@@ -12,24 +12,14 @@ export class Search {
     this.client = tavily(config)
   }
 
-  public async search(question: string) {
+  public async search(question: string, timeRange: 'day' | 'week' | 'month' | 'year') {
     const { answer } = await this.client.search(question, {
       country: 'taiwan',
       includeAnswer: true,
-      maxResults: 1,
-      searchDepth: 'advanced'
+      maxResults: 3,
+      searchDepth: 'advanced',
+      timeRange
     })
     return answer
-  }
-
-  public async extract(url: string) {
-    const { results } = await this.client.extract([url])
-
-    const result = results.find((result) => result.url === url)
-    if (!result) {
-      return ''
-    }
-
-    return result.rawContent
   }
 }
