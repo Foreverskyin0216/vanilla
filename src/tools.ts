@@ -91,17 +91,17 @@ export const tools = {
     },
     {
       name: 'react',
-      description: `Choose a appropriate reaction code to react to the message.
-        - 2: NICE
-        - 3: LOVE
-        - 4: FUN
-        - 5: AMAZING
-        - 6: SAD
-        - 7: OMG
+      description: `Choose the appropriate reaction code to respond to the other person's message.
+        - 2: NICE (You agree with what the other person said)
+        - 3: LOVE (What the other person said makes you feel warm)
+        - 4: FUN (What the other person said is interesting)
+        - 5: ADMIRE (What the other person said makes you feel admiration)
+        - 6: SAD (You feel sorry for the other person)
+        - 7: OMG (What the other person said surprises you)
       `,
       schema: z.object({
-        reaction: z.enum(['2', '3', '4', '5', '6', '7']).describe('The reaction code to react to the message.'),
-        reason: z.string().describe('The reason for the reaction.')
+        reaction: z.enum(['2', '3', '4', '5', '6', '7']).describe('reaction code'),
+        reason: z.string().describe('reason for the reaction')
       })
     }
   ),

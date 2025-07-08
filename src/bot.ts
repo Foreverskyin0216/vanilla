@@ -110,7 +110,10 @@ export class ChatBot {
 
       const answer = messages[messages.length - 1].content.toString()
       if (answer && !answer.includes('[debug]')) {
-        await event.reply({ text: answer.replaceAll(`${this.botName}: `, ''), relatedMessageId: message.id })
+        await event.reply({
+          text: answer.replaceAll(`${this.botName}:`, '').replaceAll(`${this.botName}：`, '').trim(),
+          relatedMessageId: message.id
+        })
       }
     } catch (error) {
       console.error(error)
