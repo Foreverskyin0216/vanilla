@@ -13,25 +13,25 @@
   },
   "dependencies": {
     "@evex/linejs": "npm:@jsr/evex__linejs@^2.1.7",
-    "@langchain/core": "^0.3.61",
-    "@langchain/langgraph": "^0.3.5",
-    "@langchain/openai": "^0.5.16",
-    "@tavily/core": "^0.5.8",
+    "@langchain/core": "^0.3.62",
+    "@langchain/langgraph": "^0.3.6",
+    "@langchain/openai": "^0.5.18",
+    "@tavily/core": "^0.5.9",
     "cheerio": "^1.1.0",
     "langchain": "^0.3.29",
-    "zod": "^3.25.67"
+    "zod": "^3.25.75"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "@eslint/js": "^9.30.0",
-    "dotenv": "^17.0.0",
-    "eslint": "^9.30.0",
+    "@eslint/js": "^9.30.1",
+    "dotenv": "^17.1.0",
+    "eslint": "^9.30.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "prettier": "^3.6.2",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.35.0"
+    "typescript-eslint": "^8.36.0"
   },
   "lint-staged": {
     "*.ts": [
