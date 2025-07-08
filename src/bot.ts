@@ -100,7 +100,7 @@ export class ChatBot {
           reaction: 0
         },
         {
-          configurable: { ai: this.ai, search: this.search, square } as AppConfig
+          configurable: { ai: this.ai, botName: this.botName, search: this.search, square } as AppConfig
         }
       )
 

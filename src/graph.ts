@@ -3,6 +3,7 @@ import type { RunnableConfig } from '@langchain/core/runnables'
 import type { AppConfig } from './types'
 
 import { SystemMessage } from '@langchain/core/messages'
+import { PromptTemplate } from '@langchain/core/prompts'
 import { Annotation, Command, StateGraph, messagesStateReducer } from '@langchain/langgraph'
 import { ToolNode } from '@langchain/langgraph/prebuilt'
 
@@ -18,9 +19,10 @@ const annotation = Annotation.Root({
 type State = typeof annotation.State
 
 const handleMessages = async (state: State, { configurable }: RunnableConfig) => {
-  const { ai } = configurable as AppConfig
+  const { ai, botName } = configurable as AppConfig
+  const prompt = await PromptTemplate.fromTemplate(prompts.VANILLA_PERSONALITY).format({ botName })
 
-  const input = [new SystemMessage(prompts.VANILLA_PERSONALITY), ...state.messages]
+  const input = [new SystemMessage(prompt), ...state.messages]
   const response = await ai.callTools(Object.values(tools), input)
 
   return new Command({ goto: response.tool_calls?.length ? 'callTools' : '__end__', update: { messages: [response] } })

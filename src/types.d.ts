@@ -4,6 +4,7 @@ import type { Search } from './search'
 
 export type AppConfig = {
   ai: AI
+  botName: string
   search: Search
   square: SquareStatus
 }
