@@ -9,6 +9,7 @@ import Queue from 'p-queue'
 
 import { AI } from './ai'
 import { Search } from './search'
+import { MemoryVectorStore } from './store'
 import { buildGraph } from './graph'
 
 export class ChatBot {
@@ -69,7 +70,11 @@ export class ChatBot {
     if (squareChatId in this.botStatus) {
       return
     }
-    this.botStatus[squareChatId] = { botId: '', conversation: [], members: {} }
+
+    const embeddings = this.ai.createEmbeddings()
+    const vectorStore = new MemoryVectorStore(embeddings)
+
+    this.botStatus[squareChatId] = { botId: '', conversation: [], members: {}, vectorStore }
   }
 
   private async _chat(event: SquareMessage) {
@@ -109,7 +114,7 @@ export class ChatBot {
       }
 
       const answer = messages[messages.length - 1].content.toString()
-      if (answer && !answer.includes('[debug]')) {
+      if (answer) {
         await event.reply({
           text: answer.replaceAll(`${this.botName}:`, '').replaceAll(`${this.botName}：`, '').trim(),
           relatedMessageId: message.id

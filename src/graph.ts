@@ -12,7 +12,6 @@ import { tools } from './tools'
 
 const annotation = Annotation.Root({
   messages: Annotation<BaseMessage[]>({ reducer: messagesStateReducer }),
-  responseType: Annotation<string>,
   reaction: Annotation<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>
 })
 
