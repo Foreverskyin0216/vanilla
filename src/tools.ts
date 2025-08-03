@@ -116,7 +116,7 @@ export const tools = {
     {
       name: 'react',
       description: `當用戶的問題讓你感覺到以下情緒時，使用這個工具來回應用戶的訊息。
-      選擇適合的反應代碼來回應用戶的訊息:
+      選擇適合的表情符號(reaction code)來回應用戶的訊息:
         - 2: NICE (你同意對方的說法，或覺得對方說的很棒)
         - 3: LOVE (對方的說法讓你感到溫暖)
         - 4: FUN (對方的說法讓你感到有趣)
@@ -125,8 +125,8 @@ export const tools = {
         - 7: OMG (對方的說法讓你感到驚訝)
       `,
       schema: z.object({
-        reaction: z.enum(['2', '3', '4', '5', '6', '7']).describe('反應代碼'),
-        reason: z.string().describe('選擇反應代碼的原因')
+        reaction: z.enum(['2', '3', '4', '5', '6', '7']).describe('表情符號(reaction code)'),
+        reason: z.string().describe('選擇表情符號的原因')
       })
     }
   )
