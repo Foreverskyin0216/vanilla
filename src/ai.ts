@@ -1,7 +1,7 @@
 import type { BaseMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import type { ChatOpenAICallOptions, OpenAIChatInput } from '@langchain/openai'
-import type { ZodObject } from 'zod'
+import type { ZodJSONSchema } from 'zod'
 
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai'
 import { Embeddings } from '@langchain/core/embeddings'
@@ -47,7 +47,7 @@ export class AI {
     return this._llms[model].invoke(messages)
   }
 
-  public async getStructuredOutput<T>(messages: BaseMessage[], schema: ZodObject, model = 'default') {
+  public async getStructuredOutput<T>(messages: BaseMessage[], schema: ZodJSONSchema, model = 'default') {
     if (!this._llms[model]) {
       const clonedLLM = this._clone<ChatOpenAI>(this._llms.default)
       this._llms[model] = clonedLLM

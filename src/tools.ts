@@ -22,18 +22,17 @@ export const tools = {
     },
     {
       name: 'websearch',
-      description: `When the user's question requires
-        - real-time information
-        - specific time range
-        - specific domain information
-        - specific topic information
-        - specific event information
-        - specific location information
-      use this tool.
+      description: `當用戶的問題需要取得以下資訊時，使用這個工具:
+        - 即時資訊
+        - 特定時間範圍
+        - 特定領域資訊
+        - 特定主題資訊
+        - 特定事件資訊
+        - 特定地點資訊
       `,
       schema: z.object({
-        question: z.string().describe('The question or topic to search for on the web.'),
-        timeRange: z.enum(['day', 'week', 'month', 'year']).describe('The time range to search for.')
+        question: z.string().describe('要搜尋的問題或主題。'),
+        timeRange: z.enum(['day', 'week', 'month', 'year']).describe('要搜尋的時間範圍。')
       })
     }
   ),
@@ -49,10 +48,7 @@ export const tools = {
     },
     {
       name: 'summary',
-      description: `When the user's question requires
-        - summary of the conversation
-      use this tool.
-      `,
+      description: `當用戶的問題是關於生成對話的摘要或總結時，使用這個工具。`,
       schema: z.object({})
     }
   ),
@@ -78,12 +74,9 @@ export const tools = {
     },
     {
       name: 'chatHistory',
-      description: `When the user's question is related to someone in the chat room,
-      but the answer is not in the conversation,
-      use this tool to retrieve the information from the long-term chat history.
-      `,
+      description: `當用戶的問題是關於聊天室中的某個人，但答案不在對話中時，使用這個工具來從長期聊天記錄中檢索資訊。`,
       schema: z.object({
-        question: z.string().describe('The question or topic to search for in the chat history.')
+        question: z.string().describe('要檢索的問題或主題。')
       })
     }
   ),
@@ -96,19 +89,16 @@ export const tools = {
         goto: 'handleMessages',
         update: {
           reaction: 2,
-          messages: [new ToolMessage({ content: 'Done', tool_call_id: toolCall.id })]
+          messages: [new ToolMessage({ content: '已記住', tool_call_id: toolCall.id })]
         }
       })
     },
     {
       name: 'updateChatHistory',
-      description: 'When the user wants you to remember something, use this tool.',
+      description: '當用戶想要你記住某些事情時，使用這個工具。',
       schema: z.object({
-        content: z.string().describe('The content to remember. It should be a short summary or some key points.'),
-        target: z.string().describe(
-          `The target user to remember the content for.
-          If not specified, the content will be remembered for the user who is currently talking.`
-        )
+        content: z.string().describe('要記住的事情的內容。'),
+        target: z.string().describe('要記住事情的人。如果沒有指定，則會記住目前正在說話的人。')
       })
     }
   ),
@@ -125,20 +115,18 @@ export const tools = {
     },
     {
       name: 'react',
-      description: `When your feelings meet the following conditions, use this tool to react to the other person's message.
-      Choose the appropriate reaction code to respond to the other person's message.
-        - 2: NICE (You agree with what the other person said)
-        - 3: LOVE (What the other person said makes you feel warm)
-        - 4: FUN (What the other person said is interesting)
-        - 5: ADMIRE (What the other person said makes you feel admiration)
-        - 6: SAD (You feel sorry for the other person)
-        - 7: OMG (What the other person said surprises you)
-      
-      DO NOT use this tool every time.
+      description: `當用戶的問題讓你感覺到以下情緒時，使用這個工具來回應用戶的訊息。
+      選擇適合的反應代碼來回應用戶的訊息:
+        - 2: NICE (你同意對方的說法，或覺得對方說的很棒)
+        - 3: LOVE (對方的說法讓你感到溫暖)
+        - 4: FUN (對方的說法讓你感到有趣)
+        - 5: ADMIRE (對方的說法讓你感到佩服)
+        - 6: SAD (你對對方的說法感到抱歉)
+        - 7: OMG (對方的說法讓你感到驚訝)
       `,
       schema: z.object({
-        reaction: z.enum(['2', '3', '4', '5', '6', '7']).describe('reaction code'),
-        reason: z.string().describe('reason for the reaction')
+        reaction: z.enum(['2', '3', '4', '5', '6', '7']).describe('反應代碼'),
+        reason: z.string().describe('選擇反應代碼的原因')
       })
     }
   )
