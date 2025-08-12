@@ -74,7 +74,7 @@ export const tools = {
     },
     {
       name: 'chatHistory',
-      description: `當用戶的問題是關於聊天室中的某個人，但答案不在對話中時，使用這個工具來從長期聊天記錄中檢索資訊。`,
+      description: `當用戶問你記不記得特定事情時，使用這個工具來檢索聊天記錄。`,
       schema: z.object({
         question: z.string().describe('要檢索的問題或主題。')
       })
@@ -95,7 +95,7 @@ export const tools = {
     },
     {
       name: 'updateChatHistory',
-      description: '當用戶想要你記住某些事情時，使用這個工具。',
+      description: '當用戶的意圖包含要求你記住特定事情時，必須使用這個工具來記住。',
       schema: z.object({
         content: z.string().describe('要記住的事情的內容。'),
         target: z.string().describe('要記住事情的人。如果沒有指定，則會記住目前正在說話的人。')
@@ -115,7 +115,7 @@ export const tools = {
     },
     {
       name: 'react',
-      description: `當用戶的問題讓你感覺到以下情緒時，使用這個工具來回應用戶的訊息。
+      description: `偶爾使用這個工具來回應用戶的訊息。
       選擇適合的表情符號(reaction code)來回應用戶的訊息:
         - 2: NICE (你同意對方的說法，或覺得對方說的很棒)
         - 3: LOVE (對方的說法讓你感到溫暖)
