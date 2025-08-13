@@ -32,7 +32,7 @@ export const tools = {
       `,
       schema: z.object({
         question: z.string().describe('要搜尋的問題或主題。'),
-        timeRange: z.enum(['day', 'week', 'month', 'year']).describe('要搜尋的時間範圍。')
+        timeRange: z.enum(['day', 'week', 'month', 'year']).describe('要搜尋的時間範圍。預設使用當天。')
       })
     }
   ),
