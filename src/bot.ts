@@ -22,7 +22,7 @@ export class ChatBot {
   private search: Search
 
   constructor(botName: string, device: Device = 'DESKTOPMAC') {
-    this.ai = new AI({ model: 'gpt-5-chat' })
+    this.ai = new AI({ model: 'gpt-4.1' })
     this.botName = botName
     this.client = new Client(new BaseClient({ device }))
     this.search = new Search()
