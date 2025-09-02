@@ -12,24 +12,24 @@
     "pre-commit": "lint-staged"
   },
   "dependencies": {
-    "@evex/linejs": "npm:@jsr/evex__linejs@^2.1.9",
-    "@langchain/core": "^0.3.66",
-    "@langchain/langgraph": "^0.4.2",
-    "@langchain/openai": "^0.6.3",
-    "@tavily/core": "^0.5.10",
-    "zod": "^4.0.14"
+    "@evex/linejs": "npm:@jsr/evex__linejs@^2.2.0",
+    "@langchain/core": "^0.3.72",
+    "@langchain/langgraph": "^0.4.8",
+    "@langchain/openai": "^0.6.9",
+    "@tavily/core": "^0.5.11",
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "@eslint/js": "^9.32.0",
+    "@eslint/js": "^9.34.0",
     "dotenv": "^17.2.1",
-    "eslint": "^9.32.0",
+    "eslint": "^9.34.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.1.2",
+    "lint-staged": "^16.1.6",
     "prettier": "^3.6.2",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.38.0"
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.41.0"
   },
   "lint-staged": {
     "*.ts": [
