@@ -1,0 +1,67 @@
+[project]
+name = "vanilla"
+version = "1.0.0"
+description = "Vanilla is a LINE chatbot that role-plays as an elegant lady using LangGraph and OpenAI."
+authors = [{ name = "Foreverskyin0216" }]
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.28.0",
+    "pycryptodome>=3.21.0",
+    "pynacl>=1.5.0",
+    "langchain>=1.0.0",
+    "langchain-openai>=0.3.0",
+    "langgraph>=0.6.0",
+    "langgraph-checkpoint-postgres>=2.0.0",
+    "psycopg[binary]>=3.0.0",
+    "langfuse>=2.0.0",
+    "tavily-python>=0.5.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "rich>=13.0.0",
+    "croniter>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.25.0",
+    "pre-commit>=4.0.0",
+]
+
+[project.scripts]
+vanilla = "src.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]  # Line too long - handled by formatter, and needed for Chinese prompts
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.0.0",
+]
