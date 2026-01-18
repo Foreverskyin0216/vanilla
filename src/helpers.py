@@ -610,7 +610,7 @@ def _is_mentioned(context: ChatContext) -> bool:
     return "MENTION" in metadata and chat_data.bot_id in mention_data
 
 
-def _is_reply(context: ChatContext) -> bool:
+async def _is_reply(context: ChatContext) -> bool:
     """Check if the message is a reply to one of the bot's messages."""
     if not context.event:
         return False
@@ -628,8 +628,49 @@ def _is_reply(context: ChatContext) -> bool:
     if not is_known_member:
         return False
 
-    # Check if replying to one of the bot's messages
-    return related_message_id in chat_data.bot_message_ids
+    # Check if replying to one of the bot's messages (fast path)
+    if related_message_id in chat_data.bot_message_ids:
+        return True
+
+    # Fallback: if bot_id is set but bot_message_ids is empty/doesn't have this ID,
+    # fetch recent messages to check if the replied message is from the bot
+    if chat_data.bot_id and context.client and context.chat_type == "square":
+        try:
+            # Fetch recent messages to find the replied message
+            result = await context.client.base.square.fetch_square_chat_events(
+                square_chat_mid=message_to,
+                limit=50,  # Fetch last 50 messages
+                direction=2,  # BACKWARD (most recent first)
+            )
+            events = result.get(2) or result.get("events", [])
+
+            for event in events:
+                # Get event type (field 3)
+                event_type = event.get(3) or event.get("eventType")
+                # SquareEventType: RECEIVE_MESSAGE = 0, SEND_MESSAGE = 1
+                if event_type not in (0, 1):
+                    continue
+
+                payload = event.get(4) or event.get("payload", {})
+                # Get message from payload (field 1 for receiveMessage, field 2 for sendMessage)
+                msg_wrapper = payload.get(1) or payload.get(2) or {}
+                sq_msg = msg_wrapper.get(2) or msg_wrapper.get("squareMessage", {})
+                inner_msg = sq_msg.get(1) or sq_msg.get("message", {})
+
+                msg_id = inner_msg.get(4) or inner_msg.get("id", "")
+                if msg_id == related_message_id:
+                    # Found the replied message, check if sender is bot
+                    sender_mid = inner_msg.get(1) or inner_msg.get("from", "")
+                    if sender_mid == chat_data.bot_id:
+                        # Cache this for future checks
+                        chat_data.bot_message_ids.add(msg_id)
+                        logger.debug(f"_is_reply: found bot message via API, ID={msg_id[:20]}...")
+                        return True
+                    break
+        except Exception as e:
+            logger.debug(f"_is_reply: fallback API check failed: {e}")
+
+    return False
 
 
 async def update_chat_info(
@@ -672,15 +713,26 @@ async def update_chat_info(
     # Check if this is the bot's own message
     if isinstance(context.event, SquareMessage):
         is_bot_reply = await context.event.is_my_message()
+        # Set bot_id from cache after is_my_message() populates it
+        if chat_data and context.client:
+            cache = context.client._square_member_mid_cache
+            if message_to in cache and not chat_data.bot_id:
+                chat_data.bot_id = cache[message_to]
+                logger.debug(f"update_chat_info: set bot_id={chat_data.bot_id[:20]}...")
     else:
         is_bot_reply = context.event.is_my_message
 
     if is_bot_reply:
+        # Record bot's own message ID for reply detection
+        # This helps when service restarts and bot_message_ids is empty
+        if chat_data and message_id:
+            chat_data.bot_message_ids.add(message_id)
+            logger.debug(f"update_chat_info: recorded bot message ID {message_id[:20]}...")
         return Command(goto="__end__")
 
     # Check if mentioned or replied to
     is_mentioned = _is_mentioned(context)
-    is_reply = _is_reply(context)
+    is_reply = await _is_reply(context)
 
     # For stickers, only respond if it's a reply to bot's message
     # (you can't mention someone in a sticker, so is_mentioned is not applicable)

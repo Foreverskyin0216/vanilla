@@ -367,7 +367,8 @@ class TestIsMentioned:
 class TestIsReply:
     """Tests for _is_reply function."""
 
-    def test_is_reply_to_bot_message(self, context):
+    @pytest.mark.asyncio
+    async def test_is_reply_to_bot_message(self, context):
         """Test detection of reply to bot's message."""
         context.square["chat456"] = SquareData()
         context.square["chat456"].members.append(Member(id="user123", name="Test User"))
@@ -376,16 +377,18 @@ class TestIsReply:
 
         context.event.raw["message"]["relatedMessageId"] = "prev_msg"
 
-        assert _is_reply(context) is True
+        assert await _is_reply(context) is True
 
-    def test_not_reply_no_related_id(self, context):
+    @pytest.mark.asyncio
+    async def test_not_reply_no_related_id(self, context):
         """Test not a reply when no relatedMessageId."""
         context.square["chat456"] = SquareData()
         context.square["chat456"].members.append(Member(id="user123", name="Test User"))
 
-        assert _is_reply(context) is False
+        assert await _is_reply(context) is False
 
-    def test_not_reply_unknown_member(self, context):
+    @pytest.mark.asyncio
+    async def test_not_reply_unknown_member(self, context):
         """Test not a reply when sender is unknown member."""
         context.square["chat456"] = SquareData()
         context.square["chat456"].history.append(Message(id="prev_msg", content="Previous"))
@@ -393,9 +396,10 @@ class TestIsReply:
 
         context.event.raw["message"]["relatedMessageId"] = "prev_msg"
 
-        assert _is_reply(context) is False
+        assert await _is_reply(context) is False
 
-    def test_not_reply_message_not_in_history(self, context):
+    @pytest.mark.asyncio
+    async def test_not_reply_message_not_in_history(self, context):
         """Test not a reply when related message not in history."""
         context.square["chat456"] = SquareData()
         context.square["chat456"].members.append(Member(id="user123", name="Test User"))
@@ -403,9 +407,10 @@ class TestIsReply:
 
         context.event.raw["message"]["relatedMessageId"] = "prev_msg"
 
-        assert _is_reply(context) is False
+        assert await _is_reply(context) is False
 
-    def test_not_reply_no_event(self, mock_client, mock_search):
+    @pytest.mark.asyncio
+    async def test_not_reply_no_event(self, mock_client, mock_search):
         """Test _is_reply with no event returns False."""
         ctx = SquareContext(
             bot_name="TestBot",
@@ -414,7 +419,7 @@ class TestIsReply:
             search=mock_search,
             event=None,
         )
-        assert _is_reply(ctx) is False
+        assert await _is_reply(ctx) is False
 
 
 class TestStickerReplyLogic:
@@ -440,7 +445,7 @@ class TestStickerReplyLogic:
         context.event.raw["message"]["contentMetadata"] = {"STKID": "12345"}
 
         # Verify _is_reply returns True for this sticker
-        assert _is_reply(context) is True
+        assert await _is_reply(context) is True
 
     @pytest.mark.asyncio
     async def test_sticker_without_reply_does_not_trigger(self, context):
@@ -456,7 +461,7 @@ class TestStickerReplyLogic:
         # No relatedMessageId
 
         # Verify _is_reply returns False for this sticker
-        assert _is_reply(context) is False
+        assert await _is_reply(context) is False
 
     @pytest.mark.asyncio
     async def test_sticker_mention_ignored(self, context):
