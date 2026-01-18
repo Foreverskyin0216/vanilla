@@ -73,16 +73,20 @@ bg:
 	@echo "🚀 Starting Vanilla chatbot in background..."
 	@mkdir -p logs
 	@# Rotate old logs if current log is > 10MB
-	@if [ -f logs/vanilla.log ] && [ $$(stat -f%z logs/vanilla.log 2>/dev/null || stat -c%s logs/vanilla.log 2>/dev/null) -gt 10485760 ]; then \
-		TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
-		mv logs/vanilla.log logs/vanilla.$$TIMESTAMP.log; \
-		gzip logs/vanilla.$$TIMESTAMP.log 2>/dev/null || true; \
-		echo "📦 Rotated old log to logs/vanilla.$$TIMESTAMP.log.gz"; \
-		ls -t logs/vanilla.*.log.gz 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true; \
+	@if [ -f logs/vanilla.log ]; then \
+		SIZE=$$(stat -f%z logs/vanilla.log 2>/dev/null || stat -c%s logs/vanilla.log 2>/dev/null || echo 0); \
+		if [ "$$SIZE" -gt 10485760 ]; then \
+			TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
+			mv logs/vanilla.log logs/vanilla.$$TIMESTAMP.log; \
+			gzip logs/vanilla.$$TIMESTAMP.log 2>/dev/null || true; \
+			echo "📦 Rotated old log to logs/vanilla.$$TIMESTAMP.log.gz"; \
+			ls -t logs/vanilla.*.log.gz 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true; \
+		fi; \
 	fi
-	@nohup uv run python -m src.main >> logs/vanilla.log 2>&1 & echo $$! > .pid
+	@PYTHONUNBUFFERED=1 nohup uv run python -m src.main >> logs/vanilla.log 2>&1 & echo $$! > .pid
 	@echo "✅ Started with PID $$(cat .pid)"
 	@echo "📄 Logs: logs/vanilla.log"
+	@echo "💡 Use 'make logs' to view output or 'make stop' to stop"
 
 # Stop background process
 stop:

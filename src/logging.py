@@ -16,7 +16,7 @@ class AsyncLogger:
     Async wrapper for Python's logging module.
 
     This wrapper provides both sync and async logging methods.
-    Use async methods (ainfo, adebug, etc.) in async contexts for non-blocking logging.
+    Async methods (ainfo, adebug, etc.) use fire-and-forget pattern for non-blocking logging.
     Use sync methods (info, debug, etc.) when await is not possible (e.g., in callbacks).
     """
 
@@ -34,9 +34,17 @@ class AsyncLogger:
         self._logger.log(level, msg, *args, **kwargs)
 
     async def _alog(self, level: int, msg: str, *args: Any, **kwargs: Any) -> None:
-        """Async logging call that runs in thread pool."""
+        """
+        Async logging call using fire-and-forget pattern.
+
+        This submits the log call to a thread pool but does NOT await it,
+        preventing logging from blocking the event loop. This is critical
+        for performance when running with file output (make bg) where
+        file I/O is slower than terminal I/O.
+        """
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        # Fire-and-forget: submit to executor but don't await
+        loop.run_in_executor(
             _log_executor,
             partial(self._log_sync, level, msg, *args, **kwargs),
         )
