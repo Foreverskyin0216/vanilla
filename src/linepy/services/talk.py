@@ -188,14 +188,45 @@ class TalkService:
             # 82 = E2EE_RETRY_ENCRYPT
             # 83 = E2EE_UPDATE_SENDER_KEY
             # 84 = E2EE_UPDATE_RECEIVER_KEY
-            # 99 = E2EE_RECREATE_GROUP_KEY
+            # 99 = E2EE_RECREATE_GROUP_KEY (old group key)
             e2ee_retry_codes = {81, 82, 83, 84, 99}
 
             if isinstance(error, LineError):
                 # Get error code from data - can be at key 1 (numeric) or "code" (string key)
                 error_code = error.data.get(1) or error.data.get("code")
                 if isinstance(error_code, int) and error_code in e2ee_retry_codes:
-                    if not e2ee:
+                    # For error 99 (old group key), clear the cached group key and register new one
+                    if error_code == 99:
+                        to_type = self.client.get_to_type(to) or 0
+                        if to_type != 0:  # Group chat (not USER)
+                            await logger.adebug(
+                                f"[E2EE] Error 99 (old group key), refreshing group key for {to[:20]}..."
+                            )
+                            # Clear cached group key
+                            await self.client.storage.delete(f"e2eeGroupKeys:{to}")
+                            # Register new group key
+                            try:
+                                await self.client.e2ee.try_register_e2ee_group_key(to)
+                                await logger.ainfo(
+                                    f"[E2EE] New group key registered for {to[:20]}..."
+                                )
+                            except Exception as reg_error:
+                                await logger.aerror(
+                                    f"[E2EE] Failed to register new group key: {reg_error}"
+                                )
+                                raise error
+                            # Retry with E2EE using the new group key
+                            return await self.send_message(
+                                to=to,
+                                text=text,
+                                content_type=content_type,
+                                content_metadata=content_metadata,
+                                related_message_id=related_message_id,
+                                location=location,
+                                e2ee=True,
+                            )
+                    # For other E2EE errors, just retry with E2EE if not already using it
+                    elif not e2ee:
                         return await self.send_message(
                             to=to,
                             text=text,
