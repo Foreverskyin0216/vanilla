@@ -803,6 +803,13 @@ class Client(TypedEventEmitter):
         self.base = base
         # Cache for Square member MIDs (square_chat_mid -> my_square_member_mid)
         self._square_member_mid_cache: dict[str, str] = {}
+        # Listener task tracking for health monitoring
+        self._talk_listener_task: asyncio.Task | None = None
+        self._square_listener_task: asyncio.Task | None = None
+        self._watchdog_task: asyncio.Task | None = None
+        self._listener_enabled = {"talk": False, "square": False}
+        self._listener_restart_count = {"talk": 0, "square": 0}
+        self._max_restarts = 10  # Max restarts before giving up
 
     @property
     def profile(self) -> Profile | None:
@@ -1036,10 +1043,63 @@ class Client(TypedEventEmitter):
             talk: Listen to Talk events (DM/Group)
             square: Listen to Square events (OpenChat)
         """
+        self._listener_enabled["talk"] = talk
+        self._listener_enabled["square"] = square
+
         if talk:
-            asyncio.create_task(self._listen_talk())
+            self._talk_listener_task = asyncio.create_task(
+                self._listen_talk(), name="talk_listener"
+            )
         if square:
-            asyncio.create_task(self._listen_square())
+            self._square_listener_task = asyncio.create_task(
+                self._listen_square(), name="square_listener"
+            )
+
+        # Start watchdog to monitor listener health
+        self._watchdog_task = asyncio.create_task(
+            self._listener_watchdog(), name="listener_watchdog"
+        )
+
+    async def _listener_watchdog(self) -> None:
+        """Monitor listener tasks and restart them if they die unexpectedly."""
+        while self.base.auth_token:
+            await asyncio.sleep(5)  # Check every 5 seconds
+
+            # Check Talk listener
+            if self._listener_enabled["talk"]:
+                if self._talk_listener_task is None or self._talk_listener_task.done():
+                    if self._listener_restart_count["talk"] < self._max_restarts:
+                        self._listener_restart_count["talk"] += 1
+                        logger.warning(
+                            f"[Talk] Listener died, restarting "
+                            f"(attempt {self._listener_restart_count['talk']}/{self._max_restarts})"
+                        )
+                        self._talk_listener_task = asyncio.create_task(
+                            self._listen_talk(), name="talk_listener"
+                        )
+                    elif self._listener_restart_count["talk"] == self._max_restarts:
+                        self._listener_restart_count["talk"] += 1  # Only log once
+                        logger.error(
+                            f"[Talk] Listener exceeded max restarts ({self._max_restarts}), giving up"
+                        )
+
+            # Check Square listener
+            if self._listener_enabled["square"]:
+                if self._square_listener_task is None or self._square_listener_task.done():
+                    if self._listener_restart_count["square"] < self._max_restarts:
+                        self._listener_restart_count["square"] += 1
+                        logger.warning(
+                            f"[Square] Listener died, restarting "
+                            f"(attempt {self._listener_restart_count['square']}/{self._max_restarts})"
+                        )
+                        self._square_listener_task = asyncio.create_task(
+                            self._listen_square(), name="square_listener"
+                        )
+                    elif self._listener_restart_count["square"] == self._max_restarts:
+                        self._listener_restart_count["square"] += 1  # Only log once
+                        logger.error(
+                            f"[Square] Listener exceeded max restarts ({self._max_restarts}), giving up"
+                        )
 
     async def _listen_talk(self) -> None:
         """Listen to Talk events."""
@@ -1152,7 +1212,9 @@ class Client(TypedEventEmitter):
         continuation_token: str | None = None
         subscription_id: int | None = None
         consecutive_errors = 0
-        max_consecutive_errors = 5
+        max_consecutive_errors = 10  # Increased from 5 to allow more recovery attempts
+        base_backoff = 1.0  # Base delay in seconds
+        max_backoff = 60.0  # Maximum delay in seconds
 
         # Thrift field IDs for FetchMyEventsResponse
         FIELD_SUBSCRIPTION = 1
@@ -1234,23 +1296,57 @@ class Client(TypedEventEmitter):
                 consecutive_errors += 1
                 self.emit("square:error", e)
 
-                # Check if this is a persistent API error
                 error_msg = str(e)
-                if consecutive_errors >= max_consecutive_errors:
-                    logger.error(
-                        f"[Square] Stopping listener after {consecutive_errors} consecutive errors. "
-                        f"Last error: {error_msg}"
-                    )
-                    logger.error(
-                        "[Square] This may indicate the account has no Squares or "
-                        "the device type doesn't support Square API."
-                    )
-                    break
+                error_type = type(e).__name__
 
-                await asyncio.sleep(1)
+                # Classify error type for better handling
+                is_transient = any(
+                    keyword in error_msg.lower()
+                    for keyword in ["timeout", "connection", "network", "reset", "refused"]
+                ) or error_type in ["TimeoutError", "ConnectionError", "HTTPError"]
+
+                if is_transient:
+                    # Exponential backoff for transient errors
+                    backoff_delay = min(base_backoff * (2 ** (consecutive_errors - 1)), max_backoff)
+                    logger.warning(
+                        f"[Square] Transient error ({error_type}): {error_msg[:100]}. "
+                        f"Retry {consecutive_errors}/{max_consecutive_errors} in {backoff_delay:.1f}s"
+                    )
+                    await asyncio.sleep(backoff_delay)
+                else:
+                    # API errors - check if we should stop
+                    if consecutive_errors >= max_consecutive_errors:
+                        logger.error(
+                            f"[Square] Stopping listener after {consecutive_errors} consecutive errors. "
+                            f"Last error: {error_msg}"
+                        )
+                        logger.error(
+                            "[Square] This may indicate the account has no Squares or "
+                            "the device type doesn't support Square API."
+                        )
+                        break
+
+                    logger.warning(
+                        f"[Square] API error ({error_type}): {error_msg[:100]}. "
+                        f"Retry {consecutive_errors}/{max_consecutive_errors}"
+                    )
+                    await asyncio.sleep(2)  # Fixed delay for API errors
 
     async def close(self) -> None:
         """Close the client and release resources."""
+        # Cancel listener tasks
+        for task in [
+            self._talk_listener_task,
+            self._square_listener_task,
+            self._watchdog_task,
+        ]:
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
         await self.base.close()
 
 

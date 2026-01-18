@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import time
 from typing import Any
 
 from langchain_core.messages import HumanMessage
@@ -153,28 +154,81 @@ class ChatBot:
                 chat_id=thread_id,
             )
 
-            await self.app.ainvoke(
-                {"messages": [HumanMessage(content=event.text)]},
-                config={
-                    "callbacks": [self.langfuse_handler],
-                    "configurable": {"thread_id": thread_id},
-                },
-                context=vanilla_context,
-            )
+            # Set a timeout for the entire graph invocation to prevent blocking
+            # the message worker indefinitely
+            try:
+                await asyncio.wait_for(
+                    self.app.ainvoke(
+                        {"messages": [HumanMessage(content=event.text)]},
+                        config={
+                            "callbacks": [self.langfuse_handler],
+                            "configurable": {"thread_id": thread_id},
+                        },
+                        context=vanilla_context,
+                    ),
+                    timeout=300.0,  # 5 minutes max for entire graph invocation
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    f"Graph invocation timed out after 300s for {chat_type} message "
+                    f"in thread {thread_id[:20]}..."
+                )
         except Exception as e:
             logger.exception(f"Error processing {chat_type} message: {e}")
 
     async def _message_worker(self) -> None:
-        """Worker that processes messages from the queue."""
+        """Worker that dispatches messages to concurrent processing tasks.
+
+        Messages are processed in parallel - each message spawns a new task
+        without blocking the worker, so new messages can be received immediately.
+        """
+        # Track active processing tasks for cleanup
+        active_tasks: set[asyncio.Task] = set()
+        max_concurrent_tasks = 50  # Limit concurrent processing to prevent overload
+
+        def _on_task_done(task: asyncio.Task) -> None:
+            """Callback to remove completed tasks from tracking set."""
+            active_tasks.discard(task)
+            self.queue.task_done()
+            # Log any exceptions from the task
+            if task.cancelled():
+                return
+            exc = task.exception()
+            if exc:
+                logger.exception(f"Message processing task failed: {exc}")
+
         while self._running:
             try:
+                # Wait for next message
                 event, chat_type = await asyncio.wait_for(self.queue.get(), timeout=1.0)
-                await self._process_message(event, chat_type)
-                self.queue.task_done()
+
+                # If too many concurrent tasks, wait for some to complete
+                while len(active_tasks) >= max_concurrent_tasks:
+                    logger.warning(
+                        f"Max concurrent tasks reached ({max_concurrent_tasks}), "
+                        f"waiting for tasks to complete..."
+                    )
+                    # Wait for at least one task to complete
+                    done, _ = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
+                    # Tasks are removed by their callbacks
+
+                # Spawn a new task for this message (non-blocking)
+                task = asyncio.create_task(
+                    self._process_message(event, chat_type),
+                    name=f"process_{chat_type}_{time.time():.0f}",
+                )
+                active_tasks.add(task)
+                task.add_done_callback(_on_task_done)
+
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
                 logger.exception(f"Worker error: {e}")
+
+        # Cleanup: wait for all active tasks to complete on shutdown
+        if active_tasks:
+            logger.info(f"Waiting for {len(active_tasks)} active message tasks to complete...")
+            await asyncio.gather(*active_tasks, return_exceptions=True)
 
     def _on_square_message(self, event: SquareMessage) -> None:
         """Handle incoming Square message."""
