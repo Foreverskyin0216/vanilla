@@ -868,10 +868,11 @@ async def chat(
         sent_message_id = None
         if isinstance(result, dict):
             # Square: SendMessageResponse -> squareMessage (field 1) -> message (field 1) -> id (field 4)
-            sq_msg = result.get(1) or result.get("squareMessage", {})
-            if sq_msg:
-                msg = sq_msg.get(1) or sq_msg.get("message", {})
-                sent_message_id = msg.get(4) or msg.get("id")
+            sq_msg = result.get(1) or result.get("squareMessage")
+            if isinstance(sq_msg, dict):
+                msg = sq_msg.get(1) or sq_msg.get("message")
+                if isinstance(msg, dict):
+                    sent_message_id = msg.get(4) or msg.get("id")
             # Talk: Message struct directly -> id (field 4)
             if not sent_message_id:
                 sent_message_id = result.get(4) or result.get("id")
