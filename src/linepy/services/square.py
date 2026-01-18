@@ -71,6 +71,7 @@ class SquareService:
         continuation_token: str | None = None,
         limit: int = 100,
         subscription_id: int | None = None,
+        timeout: int | None = None,
     ) -> dict:
         """Fetch personalized Square events.
 
@@ -79,6 +80,9 @@ class SquareService:
             2: string syncToken
             3: i32 limit
             4: string continuationToken
+
+        Args:
+            timeout: Request timeout in milliseconds (defaults to long_timeout for long polling)
         """
         request_data: list[list] = [[8, 3, limit]]  # limit is field 3 (i32)
         if subscription_id is not None:
@@ -96,6 +100,8 @@ class SquareService:
             self.protocol_type,
             True,
             self.request_path,
+            {},
+            timeout or self.client.config.long_timeout,
         )
 
     async def fetch_square_chat_events(

@@ -630,8 +630,8 @@ def _is_reply(context: ChatContext) -> bool:
     if not is_known_member:
         return False
 
-    # Check if replying to a message in history
-    return any(m.id == related_message_id for m in chat_data.history)
+    # Check if replying to one of the bot's messages
+    return related_message_id in chat_data.bot_message_ids
 
 
 async def update_chat_info(
@@ -861,7 +861,23 @@ async def chat(
 
     # Send reply
     try:
-        await context.event.reply(text=clean_answer)
+        result = await context.event.reply(text=clean_answer)
+        # Store bot's message ID for reply detection
+        # Response structure varies: Square returns nested structure, Talk returns flat
+        # Try to extract message ID from the response
+        sent_message_id = None
+        if isinstance(result, dict):
+            # Square: SendMessageResponse -> squareMessage (field 1) -> message (field 1) -> id (field 4)
+            sq_msg = result.get(1) or result.get("squareMessage", {})
+            if sq_msg:
+                msg = sq_msg.get(1) or sq_msg.get("message", {})
+                sent_message_id = msg.get(4) or msg.get("id")
+            # Talk: Message struct directly -> id (field 4)
+            if not sent_message_id:
+                sent_message_id = result.get(4) or result.get("id")
+        if sent_message_id:
+            chat_data.bot_message_ids.add(sent_message_id)
+            await logger.adebug(f"chat: stored bot message ID {sent_message_id[:20]}...")
     except Exception as e:
         await logger.aerror(f"chat: reply failed: {e}")
 

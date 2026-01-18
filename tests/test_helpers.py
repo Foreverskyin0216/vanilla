@@ -372,6 +372,7 @@ class TestIsReply:
         context.square["chat456"] = SquareData()
         context.square["chat456"].members.append(Member(id="user123", name="Test User"))
         context.square["chat456"].history.append(Message(id="prev_msg", content="Previous"))
+        context.square["chat456"].bot_message_ids.add("prev_msg")
 
         context.event.raw["message"]["relatedMessageId"] = "prev_msg"
 
@@ -430,6 +431,7 @@ class TestStickerReplyLogic:
         context.chats["chat456"] = ChatData()
         context.chats["chat456"].members.append(Member(id="user123", name="Test User"))
         context.chats["chat456"].history.append(Message(id="bot_prev_msg", content="Hello"))
+        context.chats["chat456"].bot_message_ids.add("bot_prev_msg")
 
         # Update event to be a sticker reply
         context.event.raw["message"]["contentType"] = 7  # STICKER

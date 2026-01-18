@@ -178,13 +178,13 @@ class LineServer:
                         msg = TalkMessage(message, self.client)
                         await self._emit("talk:message", self._serialize_message(msg))
 
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 await self._emit("error", {"type": "talk", "error": str(e)})
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
 
     async def _poll_square(self) -> None:
         """Poll for Square events."""
@@ -242,13 +242,13 @@ class LineServer:
                             msg = SquareMessage(sq_msg, self.client)
                             await self._emit("square:message", self._serialize_square_message(msg))
 
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 await self._emit("error", {"type": "square", "error": str(e)})
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
 
     def _serialize_message(self, msg: TalkMessage) -> dict:
         """Serialize a TalkMessage for JSON."""

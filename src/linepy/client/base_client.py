@@ -23,7 +23,7 @@ class Config:
     """Client configuration."""
 
     timeout: int = 30_000  # 30 seconds in milliseconds
-    long_timeout: int = 180_000  # 180 seconds in milliseconds
+    long_timeout: int = 180_000  # 180 seconds in milliseconds (for long polling)
 
 
 @dataclass

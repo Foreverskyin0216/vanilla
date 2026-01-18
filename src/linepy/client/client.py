@@ -1141,11 +1141,12 @@ class Client(TypedEventEmitter):
 
                         self.emit("message", TalkMessage(message, self))
 
-                await asyncio.sleep(1)
+                # No sleep needed - long polling returns immediately when events available
+                # Only add minimal delay to prevent tight loop on empty responses
 
             except Exception as e:
                 self.emit("error", e)
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
 
     async def _listen_square(self) -> None:
         """Listen to Square events."""
@@ -1215,7 +1216,8 @@ class Client(TypedEventEmitter):
                         if sq_msg:
                             self.emit("square:message", SquareMessage(sq_msg, self))
 
-                await asyncio.sleep(1)
+                # No sleep needed - long polling returns immediately when events available
+                # Only add minimal delay to prevent tight loop on empty responses
 
             except Exception as e:
                 consecutive_errors += 1
@@ -1234,7 +1236,7 @@ class Client(TypedEventEmitter):
                     )
                     break
 
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
 
     async def close(self) -> None:
         """Close the client and release resources."""

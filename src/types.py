@@ -37,6 +37,8 @@ class ChatData:
     messages: list[BaseMessage] = field(default_factory=list)
     members: list[Member] = field(default_factory=list)
     history: list[Message] = field(default_factory=list)
+    # Set of message IDs sent by the bot (for reply detection)
+    bot_message_ids: set[str] = field(default_factory=set)
     # Member cache timestamp (Unix time)
     _member_cache_time: float = 0.0
     # Dict of processed message IDs to timestamps for TTL-based expiry
