@@ -126,8 +126,6 @@ class TestProcessMessage:
 
         with caplog.at_level(logging.ERROR):
             await bot._process_message(mock_event, "square")
-            # Give async logger time to write
-            await asyncio.sleep(0.1)
 
         assert any("Error processing" in record.message for record in caplog.records)
 

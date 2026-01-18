@@ -74,7 +74,7 @@ class UserPreferencesStore:
     async def setup(self) -> None:
         """Set up the preferences database table."""
         if not self._postgres_url:
-            await logger.awarning("No PostgreSQL URL provided, preferences will not be persisted")
+            logger.warning("No PostgreSQL URL provided, preferences will not be persisted")
             return
 
         try:
@@ -104,9 +104,9 @@ class UserPreferencesStore:
                         ON user_preferences(user_id, chat_id)
                     """)
                     await conn.commit()
-            await logger.ainfo("User preferences database table set up successfully")
+            logger.info("User preferences database table set up successfully")
         except Exception as e:
-            await logger.aerror(f"Failed to set up preferences database: {e}")
+            logger.error(f"Failed to set up preferences database: {e}")
             raise
 
     async def set_preference(
@@ -145,7 +145,7 @@ class UserPreferencesStore:
             existing.is_active = True
             existing.updated_at = now
             await self._update_preference(existing)
-            await logger.ainfo(f"Updated preference for user {user_id[:8]}: {rule_type}/{rule_key}")
+            logger.info(f"Updated preference for user {user_id[:8]}: {rule_type}/{rule_key}")
             return existing
         else:
             # Create new preference
@@ -162,7 +162,7 @@ class UserPreferencesStore:
                 updated_at=now,
             )
             await self._save_preference(pref)
-            await logger.ainfo(f"Created preference for user {user_id[:8]}: {rule_type}/{rule_key}")
+            logger.info(f"Created preference for user {user_id[:8]}: {rule_type}/{rule_key}")
             return pref
 
     async def get_preference(
@@ -213,7 +213,7 @@ class UserPreferencesStore:
                             updated_at=row[8],
                         )
         except Exception as e:
-            await logger.aerror(f"Failed to get preference: {e}")
+            logger.error(f"Failed to get preference: {e}")
         return None
 
     async def get_preferences_for_user(
@@ -271,7 +271,7 @@ class UserPreferencesStore:
                             )
                         )
         except Exception as e:
-            await logger.aerror(f"Failed to get preferences for user: {e}")
+            logger.error(f"Failed to get preferences for user: {e}")
         return preferences
 
     async def delete_preference(
@@ -310,12 +310,12 @@ class UserPreferencesStore:
                     await conn.commit()
                     deleted = cur.rowcount > 0
                     if deleted:
-                        await logger.ainfo(
+                        logger.info(
                             f"Deleted preference for user {user_id[:8]}: {rule_type}/{rule_key}"
                         )
                     return deleted
         except Exception as e:
-            await logger.aerror(f"Failed to delete preference: {e}")
+            logger.error(f"Failed to delete preference: {e}")
         return False
 
     async def _save_preference(self, pref: UserPreference) -> None:
@@ -347,7 +347,7 @@ class UserPreferencesStore:
                     )
                     await conn.commit()
         except Exception as e:
-            await logger.aerror(f"Failed to save preference {pref.id}: {e}")
+            logger.error(f"Failed to save preference {pref.id}: {e}")
 
     async def _update_preference(self, pref: UserPreference) -> None:
         """Update an existing preference in the database."""
@@ -367,7 +367,7 @@ class UserPreferencesStore:
                     )
                     await conn.commit()
         except Exception as e:
-            await logger.aerror(f"Failed to update preference {pref.id}: {e}")
+            logger.error(f"Failed to update preference {pref.id}: {e}")
 
 
 def format_preferences_for_prompt(preferences: list[UserPreference]) -> str:

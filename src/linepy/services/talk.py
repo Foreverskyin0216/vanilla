@@ -99,11 +99,11 @@ class TalkService:
             Sent message object
         """
         content_metadata = content_metadata or {}
-        await logger.adebug(f"send_message called with e2ee={e2ee} to={to}")
+        logger.debug(f"send_message called with e2ee={e2ee} to={to}")
 
         # Handle E2EE encryption if requested
         if e2ee and not chunks and (text or location):
-            await logger.adebug(f"E2EE encryption requested for to={to}")
+            logger.debug(f"E2EE encryption requested for to={to}")
             e2ee_data = text if text else location if location else ""
             try:
                 chunks = await self.client.e2ee.encrypt_e2ee_message(
@@ -111,9 +111,9 @@ class TalkService:
                     e2ee_data,
                     content_type,
                 )
-                await logger.adebug(f"E2EE encryption successful, chunks={len(chunks)}")
+                logger.debug(f"E2EE encryption successful, chunks={len(chunks)}")
             except Exception as e:
-                await logger.aerror(f"E2EE encryption failed: {e}")
+                logger.error(f"E2EE encryption failed: {e}")
                 raise
             content_metadata.update(
                 {
@@ -199,7 +199,7 @@ class TalkService:
                     if error_code == 99:
                         to_type = self.client.get_to_type(to) or 0
                         if to_type != 0:  # Group chat (not USER)
-                            await logger.adebug(
+                            logger.debug(
                                 f"[E2EE] Error 99 (old group key), refreshing group key for {to[:20]}..."
                             )
                             # Clear cached group key
@@ -207,11 +207,9 @@ class TalkService:
                             # Register new group key
                             try:
                                 await self.client.e2ee.try_register_e2ee_group_key(to)
-                                await logger.ainfo(
-                                    f"[E2EE] New group key registered for {to[:20]}..."
-                                )
+                                logger.info(f"[E2EE] New group key registered for {to[:20]}...")
                             except Exception as reg_error:
-                                await logger.aerror(
+                                logger.error(
                                     f"[E2EE] Failed to register new group key: {reg_error}"
                                 )
                                 raise error

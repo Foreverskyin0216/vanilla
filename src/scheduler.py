@@ -174,7 +174,7 @@ class Scheduler:
     async def setup(self) -> None:
         """Set up the scheduler database table."""
         if not self._postgres_url:
-            await logger.awarning("No PostgreSQL URL provided, tasks will not be persisted")
+            logger.warning("No PostgreSQL URL provided, tasks will not be persisted")
             return
 
         try:
@@ -205,9 +205,9 @@ class Scheduler:
                         ON scheduled_tasks(chat_id)
                     """)
                     await conn.commit()
-            await logger.ainfo("Scheduler database table set up successfully")
+            logger.info("Scheduler database table set up successfully")
         except Exception as e:
-            await logger.aerror(f"Failed to set up scheduler database: {e}")
+            logger.error(f"Failed to set up scheduler database: {e}")
             raise
 
     async def load_tasks(self) -> None:
@@ -248,9 +248,9 @@ class Scheduler:
                             task.status = TaskStatus.PENDING
                         self.tasks[task.id] = task
 
-                    await logger.ainfo(f"Loaded {len(rows)} tasks from database")
+                    logger.info(f"Loaded {len(rows)} tasks from database")
         except Exception as e:
-            await logger.aerror(f"Failed to load tasks from database: {e}")
+            logger.error(f"Failed to load tasks from database: {e}")
 
     async def _save_task(self, task: ScheduledTask) -> None:
         """Save a task to the database."""
@@ -287,7 +287,7 @@ class Scheduler:
                     )
                     await conn.commit()
         except Exception as e:
-            await logger.aerror(f"Failed to save task {task.id}: {e}")
+            logger.error(f"Failed to save task {task.id}: {e}")
 
     async def _update_task_status(self, task: ScheduledTask) -> None:
         """Update task status and triggered_count in the database."""
@@ -307,7 +307,7 @@ class Scheduler:
                     )
                     await conn.commit()
         except Exception as e:
-            await logger.aerror(f"Failed to update task status {task.id}: {e}")
+            logger.error(f"Failed to update task status {task.id}: {e}")
 
     def set_message_sender(self, sender: MessageSender) -> None:
         """
@@ -366,7 +366,7 @@ class Scheduler:
         # Persist to database
         await self._save_task(task)
 
-        await logger.ainfo(
+        logger.info(
             f"Created task {task_id[:8]}: chat={chat_id[:8]}, cron={cron_expression}, "
             f"next_trigger={task.next_trigger_at}, max={max_triggers}"
         )
@@ -512,7 +512,7 @@ class Scheduler:
         # Persist changes to database
         await self._save_task_full(task)
 
-        await logger.ainfo(
+        logger.info(
             f"Updated task {task_id[:8]}: message={message is not None}, "
             f"cron={cron_expression is not None}, desc={description is not None}"
         )
@@ -544,7 +544,7 @@ class Scheduler:
                     )
                     await conn.commit()
         except Exception as e:
-            await logger.aerror(f"Failed to save task {task.id}: {e}")
+            logger.error(f"Failed to save task {task.id}: {e}")
 
     def list_tasks(self, chat_id: str | None = None, include_system: bool = False) -> str:
         """
@@ -592,29 +592,29 @@ class Scheduler:
 
     async def _execute_task(self, task: ScheduledTask) -> None:
         """Execute a single task."""
-        await logger.ainfo(f"Executing task {task.id[:8]}: {task.description or task.message[:30]}")
+        logger.info(f"Executing task {task.id[:8]}: {task.description or task.message[:30]}")
         try:
             task.status = TaskStatus.RUNNING
             await self._update_task_status(task)
 
             # System tasks use callback, regular tasks use message sender
             if task.is_system and task.callback:
-                await logger.adebug(f"Task {task.id[:8]} is system task, calling callback")
+                logger.debug(f"Task {task.id[:8]} is system task, calling callback")
                 await task.callback()
             elif self._message_sender:
-                await logger.adebug(
+                logger.debug(
                     f"Task {task.id[:8]} sending message to {task.chat_id[:8]}: {task.message[:50]}"
                 )
                 await self._message_sender(task.chat_id, task.message)
             else:
-                await logger.awarning(f"No message sender set, cannot execute task {task.id}")
+                logger.warning(f"No message sender set, cannot execute task {task.id}")
                 task.status = TaskStatus.PENDING
                 await self._update_task_status(task)
                 return
 
             # Increment triggered count
             task.triggered_count += 1
-            await logger.ainfo(
+            logger.info(
                 f"Task {task.id[:8]} executed successfully, triggered_count={task.triggered_count}"
             )
 
@@ -622,7 +622,7 @@ class Scheduler:
             if task.max_triggers != -1 and task.triggered_count >= task.max_triggers:
                 task.status = TaskStatus.COMPLETED
                 task._next_trigger = None
-                await logger.ainfo(f"Task {task.id[:8]} completed (max triggers reached)")
+                logger.info(f"Task {task.id[:8]} completed (max triggers reached)")
             else:
                 # Set status to PENDING first, then calculate next trigger
                 task.status = TaskStatus.PENDING
@@ -630,13 +630,13 @@ class Scheduler:
 
             await self._update_task_status(task)
         except Exception as e:
-            await logger.aerror(f"Error executing task {task.id}: {e}", exc_info=True)
+            logger.error(f"Error executing task {task.id}: {e}", exc_info=True)
             task.status = TaskStatus.PENDING  # Retry on next check
             await self._update_task_status(task)
 
     async def _worker(self) -> None:
         """Background worker that checks and executes tasks."""
-        await logger.ainfo("Scheduler worker started")
+        logger.info("Scheduler worker started")
         while self._running:
             try:
                 now = datetime.now(self.timezone)
@@ -647,7 +647,7 @@ class Scheduler:
 
                     next_trigger = task.next_trigger_at
                     if next_trigger and next_trigger <= now:
-                        await logger.adebug(
+                        logger.debug(
                             f"Task {task.id[:8]} ready to execute: "
                             f"next_trigger={next_trigger}, now={now}"
                         )
@@ -656,17 +656,17 @@ class Scheduler:
                 # Check every second
                 await asyncio.sleep(1)
             except asyncio.CancelledError:
-                await logger.ainfo("Scheduler worker cancelled")
+                logger.info("Scheduler worker cancelled")
                 break
             except Exception as e:
-                await logger.aerror(f"Scheduler worker error: {e}", exc_info=True)
+                logger.error(f"Scheduler worker error: {e}", exc_info=True)
                 await asyncio.sleep(1)
-        await logger.ainfo("Scheduler worker stopped")
+        logger.info("Scheduler worker stopped")
 
     async def start(self) -> None:
         """Start the scheduler worker."""
         if self._running:
-            await logger.adebug("Scheduler already running")
+            logger.debug("Scheduler already running")
             return
 
         # Set up database and load existing tasks
@@ -675,7 +675,7 @@ class Scheduler:
 
         self._running = True
         self._worker_task = asyncio.create_task(self._worker())
-        await logger.ainfo("Scheduler started")
+        logger.info("Scheduler started")
 
     async def stop(self) -> None:
         """Stop the scheduler worker."""
@@ -683,7 +683,7 @@ class Scheduler:
         if self._worker_task:
             self._worker_task.cancel()
             self._worker_task = None
-        await logger.ainfo("Scheduler stopped")
+        logger.info("Scheduler stopped")
 
 
 def parse_cron_expression(cron_str: str) -> str:

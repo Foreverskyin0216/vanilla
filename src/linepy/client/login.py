@@ -74,7 +74,7 @@ class Login:
         try:
             await self.client.e2ee.verify_and_sync_e2ee_key()
         except Exception as e:
-            await logger.awarning(f"E2EE key verification failed: {e}")
+            logger.warning(f"E2EE key verification failed: {e}")
 
         self.client.emit("ready", self.client.profile)
 

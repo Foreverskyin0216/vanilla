@@ -217,7 +217,7 @@ class TestAddSquareMessage:
         context.square["chat456"] = SquareData()
         context.square["chat456"].members.append(Member(id="user123", name="Test User"))
 
-        await _add_square_message(context)
+        _add_square_message(context)
 
         assert len(context.square["chat456"].messages) == 1
         assert len(context.square["chat456"].history) == 1
@@ -230,7 +230,7 @@ class TestAddSquareMessage:
         context.square["chat456"] = SquareData()
         context.square["chat456"].members.append(Member(id="user123", name="Test User"))
 
-        await _add_square_message(context)
+        _add_square_message(context)
 
         # The @TestBot should be stripped
         assert context.square["chat456"].history[0].content == "Hello"
@@ -245,7 +245,7 @@ class TestAddSquareMessage:
             search=mock_search,
             event=None,
         )
-        await _add_square_message(ctx)
+        _add_square_message(ctx)
         assert len(ctx.chats["chat456"].messages) == 0
 
     @pytest.mark.asyncio
@@ -262,7 +262,7 @@ class TestAddSquareMessage:
             "STKTXT": "開心",
         }
 
-        await _add_square_message(context)
+        _add_square_message(context)
 
         assert len(context.square["chat456"].messages) == 1
         # Now creates pending marker instead of calling vision directly
@@ -281,7 +281,7 @@ class TestAddSquareMessage:
             "STKID": "12345",
         }
 
-        await _add_square_message(context)
+        _add_square_message(context)
 
         # Pending marker with empty alt text
         assert "[傳送了貼圖: PENDING:12345:]" in context.square["chat456"].messages[0].content
@@ -295,7 +295,7 @@ class TestAddSquareMessage:
         context.event.raw["message"]["contentType"] = 1
         context.event.raw["message"]["text"] = ""
 
-        await _add_square_message(context)
+        _add_square_message(context)
 
         assert "[傳送了圖片]" in context.square["chat456"].messages[0].content
 
@@ -310,7 +310,7 @@ class TestIsMentioned:
         context.event.raw["message"]["contentMetadata"] = {"MENTION": "some data"}
         context.event.raw["message"]["text"] = "Hey @TestBot how are you?"
 
-        assert await _is_mentioned(context) is True
+        assert _is_mentioned(context) is True
 
     @pytest.mark.asyncio
     async def test_not_mentioned_no_mention_metadata(self, context):
@@ -318,7 +318,7 @@ class TestIsMentioned:
         context.square["chat456"] = SquareData()
         context.event.raw["message"]["contentMetadata"] = {}
 
-        assert await _is_mentioned(context) is False
+        assert _is_mentioned(context) is False
 
     @pytest.mark.asyncio
     async def test_not_mentioned_no_name(self, context):
@@ -327,7 +327,7 @@ class TestIsMentioned:
         context.event.raw["message"]["contentMetadata"] = {"MENTION": "some data"}
         context.event.raw["message"]["text"] = "Hey @OtherBot"
 
-        assert await _is_mentioned(context) is False
+        assert _is_mentioned(context) is False
 
     @pytest.mark.asyncio
     async def test_mentioned_by_bot_id(self, context):
@@ -335,7 +335,7 @@ class TestIsMentioned:
         context.square["chat456"] = SquareData(bot_id="bot789")
         context.event.raw["message"]["contentMetadata"] = {"MENTION": "bot789"}
 
-        assert await _is_mentioned(context) is True
+        assert _is_mentioned(context) is True
 
     @pytest.mark.asyncio
     async def test_not_mentioned_wrong_bot_id(self, context):
@@ -343,7 +343,7 @@ class TestIsMentioned:
         context.square["chat456"] = SquareData(bot_id="bot789")
         context.event.raw["message"]["contentMetadata"] = {"MENTION": "other_bot"}
 
-        assert await _is_mentioned(context) is False
+        assert _is_mentioned(context) is False
 
     @pytest.mark.asyncio
     async def test_not_mentioned_no_event(self, mock_client, mock_search):
@@ -355,13 +355,13 @@ class TestIsMentioned:
             search=mock_search,
             event=None,
         )
-        assert await _is_mentioned(ctx) is False
+        assert _is_mentioned(ctx) is False
 
     @pytest.mark.asyncio
     async def test_not_mentioned_no_square_data(self, context):
         """Test _is_mentioned with no square data returns False."""
         # square is empty, no data for chat456
-        assert await _is_mentioned(context) is False
+        assert _is_mentioned(context) is False
 
 
 class TestIsReply:
@@ -479,9 +479,7 @@ class TestStickerReplyLogic:
         # Even if _is_mentioned returns True (due to MENTION metadata matching),
         # update_chat_info ignores is_mentioned for stickers and only checks is_reply.
         # Here we just verify the function runs without error.
-        await _is_mentioned(
-            context
-        )  # May return True due to MENTION metadata, but ignored for stickers
+        _is_mentioned(context)  # May return True due to MENTION metadata, but ignored for stickers
 
 
 class TestPendingStickerParsing:
@@ -642,7 +640,7 @@ class TestDeferredStickerAnalysis:
 
         # This should NOT call analyze_sticker_with_vision
         with patch("src.helpers.analyze_sticker_with_vision") as mock_vision:
-            await _add_square_message(context)
+            _add_square_message(context)
             mock_vision.assert_not_called()
 
         # Check that pending marker was created
@@ -662,7 +660,7 @@ class TestDeferredStickerAnalysis:
             "STKTXT": "可愛貓咪",
         }
 
-        await _add_square_message(context)
+        _add_square_message(context)
 
         content = context.square["chat456"].messages[0].content
         assert f"[傳送了貼圖: {PENDING_STICKER_PREFIX}99999:可愛貓咪]" in content

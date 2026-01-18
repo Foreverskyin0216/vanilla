@@ -61,11 +61,11 @@ async def cleanup_old_checkpoints(
                 old_threads = [row[0] for row in rows]
 
                 if not old_threads:
-                    await logger.ainfo("No old checkpoints to clean up")
+                    logger.info("No old checkpoints to clean up")
                     return results
 
                 results["threads_cleaned"] = len(old_threads)
-                await logger.ainfo(f"Found {len(old_threads)} threads to clean up")
+                logger.info(f"Found {len(old_threads)} threads to clean up")
 
                 # Delete checkpoint_writes for old threads
                 await cur.execute(
@@ -102,7 +102,7 @@ async def cleanup_old_checkpoints(
 
                 await conn.commit()
 
-                await logger.ainfo(
+                logger.info(
                     f"Cleanup complete: {results['checkpoints_deleted']} checkpoints, "
                     f"{results['writes_deleted']} writes, "
                     f"{results['blobs_deleted']} blobs deleted "
@@ -110,7 +110,7 @@ async def cleanup_old_checkpoints(
                 )
 
     except Exception as e:
-        await logger.aerror(f"Error during checkpoint cleanup: {e}")
+        logger.error(f"Error during checkpoint cleanup: {e}")
         raise
 
     return results
@@ -163,7 +163,7 @@ async def get_checkpoint_stats(postgres_url: str) -> dict:
                     stats["newest_checkpoint_age_days"] = (now_ms - row[1]) / (1000 * 60 * 60 * 24)
 
     except Exception as e:
-        await logger.aerror(f"Error getting checkpoint stats: {e}")
+        logger.error(f"Error getting checkpoint stats: {e}")
 
     return stats
 

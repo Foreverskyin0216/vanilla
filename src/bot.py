@@ -113,7 +113,7 @@ class ChatBot:
             chat_type: Type of chat ("square" or "talk").
         """
         if not self.app or not self.chat_context:
-            await logger.awarning("No app or chat_context, skipping message")
+            logger.warning("No app or chat_context, skipping message")
             return
 
         try:
@@ -132,9 +132,7 @@ class ChatBot:
 
             # Check if thread_id is empty
             if not thread_id:
-                await logger.awarning(
-                    f"Empty thread_id! to_type={getattr(event, 'to_type', 'N/A')}"
-                )
+                logger.warning(f"Empty thread_id! to_type={getattr(event, 'to_type', 'N/A')}")
                 return
 
             # Create context with the specific event and chat type
@@ -164,7 +162,7 @@ class ChatBot:
                 context=vanilla_context,
             )
         except Exception as e:
-            await logger.aexception(f"Error processing {chat_type} message: {e}")
+            logger.exception(f"Error processing {chat_type} message: {e}")
 
     async def _message_worker(self) -> None:
         """Worker that processes messages from the queue."""
@@ -176,7 +174,7 @@ class ChatBot:
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
-                await logger.aexception(f"Worker error: {e}")
+                logger.exception(f"Worker error: {e}")
 
     def _on_square_message(self, event: SquareMessage) -> None:
         """Handle incoming Square message."""
@@ -194,10 +192,10 @@ class ChatBot:
             chat_id: Target chat ID.
             message: Message to send.
         """
-        await logger.ainfo(f"Sending scheduled message to {chat_id}: {message[:50]}...")
+        logger.info(f"Sending scheduled message to {chat_id}: {message[:50]}...")
 
         if not self.client:
-            await logger.aerror("Cannot send scheduled message: client not initialized")
+            logger.error("Cannot send scheduled message: client not initialized")
             return
 
         try:
@@ -206,23 +204,23 @@ class ChatBot:
             # Square MIDs start with 's'
             # Talk MIDs start with 'u' (user), 'r' (room), 'c' (group/chat)
             is_square_chat = chat_id.startswith("m") or chat_id.startswith("s")
-            await logger.adebug(f"Chat ID {chat_id[:8]} is_square_chat={is_square_chat}")
+            logger.debug(f"Chat ID {chat_id[:8]} is_square_chat={is_square_chat}")
 
             if is_square_chat:
-                await logger.adebug(f"Sending to Square chat: {chat_id[:8]}")
+                logger.debug(f"Sending to Square chat: {chat_id[:8]}")
                 await self.client.base.square.send_message(
                     square_chat_mid=chat_id,
                     text=message,
                 )
             else:
-                await logger.adebug(f"Sending to Talk chat: {chat_id[:8]}")
+                logger.debug(f"Sending to Talk chat: {chat_id[:8]}")
                 await self.client.base.talk.send_message(
                     to=chat_id,
                     text=message,
                 )
-            await logger.ainfo(f"Successfully sent scheduled message to {chat_id[:8]}")
+            logger.info(f"Successfully sent scheduled message to {chat_id[:8]}")
         except Exception as e:
-            await logger.aerror(f"Error sending scheduled message to {chat_id}: {e}", exc_info=True)
+            logger.error(f"Error sending scheduled message to {chat_id}: {e}", exc_info=True)
 
     async def serve(self) -> None:
         """Start the bot and listen for messages."""
@@ -240,12 +238,12 @@ class ChatBot:
             try:
                 results = await cleanup_old_checkpoints(postgres_url, retention_days)
                 if results["threads_cleaned"] > 0:
-                    await logger.ainfo(
+                    logger.info(
                         f"Cleaned up {results['checkpoints_deleted']} old checkpoints "
                         f"from {results['threads_cleaned']} threads"
                     )
             except Exception as e:
-                await logger.awarning(f"Checkpoint cleanup failed: {e}")
+                logger.warning(f"Checkpoint cleanup failed: {e}")
 
             # Initialize scheduler with PostgreSQL persistence
             self.scheduler = Scheduler(postgres_url=postgres_url)
@@ -261,12 +259,12 @@ class ChatBot:
                 try:
                     results = await cleanup_old_checkpoints(postgres_url, retention_days)
                     if results["threads_cleaned"] > 0:
-                        await logger.ainfo(
+                        logger.info(
                             f"[Scheduled] Cleaned up {results['checkpoints_deleted']} checkpoints "
                             f"from {results['threads_cleaned']} threads"
                         )
                 except Exception as e:
-                    await logger.awarning(f"[Scheduled] Checkpoint cleanup failed: {e}")
+                    logger.warning(f"[Scheduled] Checkpoint cleanup failed: {e}")
 
             # Schedule daily cleanup at 3 AM using cron expression
             self.scheduler.create_system_task(
@@ -302,17 +300,15 @@ class ChatBot:
                 enabled_types.append("Square")
             if self.enable_talk:
                 enabled_types.append("Talk")
-            await logger.ainfo(
-                f"Bot '{self.bot_name}' is now running... ({', '.join(enabled_types)})"
-            )
-            await logger.ainfo("Scheduler is active for timed tasks.")
+            logger.info(f"Bot '{self.bot_name}' is now running... ({', '.join(enabled_types)})")
+            logger.info("Scheduler is active for timed tasks.")
 
             try:
                 # Keep running
                 while self._running:
                     await asyncio.sleep(1)
             except KeyboardInterrupt:
-                await logger.ainfo("Shutting down...")
+                logger.info("Shutting down...")
             finally:
                 self._running = False
                 await self.scheduler.stop()

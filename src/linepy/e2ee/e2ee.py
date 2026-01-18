@@ -89,20 +89,20 @@ class E2EE:
             True if the key was synced/registered, False if already in sync.
         """
         if not self.client.profile:
-            await logger.awarning("[E2EE] Cannot verify key - profile not available")
+            logger.warning("[E2EE] Cannot verify key - profile not available")
             return False
 
         # Get server's public keys for this account
         server_keys = await self.client.talk.get_e2ee_public_keys()
         if not server_keys:
-            await logger.adebug("[E2EE] No E2EE keys registered on server, will generate new key")
+            logger.debug("[E2EE] No E2EE keys registered on server, will generate new key")
             return await self._generate_and_register_e2ee_key()
 
         # Get the most recent key from the server
         # Keys are returned with fields: 1=version, 2=keyId, 4=keyData, 5=createdTime
         server_key = server_keys[0] if server_keys else None
         if not server_key:
-            await logger.adebug("[E2EE] No E2EE key found on server, will generate new key")
+            logger.debug("[E2EE] No E2EE key found on server, will generate new key")
             return await self._generate_and_register_e2ee_key()
 
         server_key_id = server_key.get(2) or server_key.get("keyId")
@@ -113,7 +113,7 @@ class E2EE:
         # Check if we have the corresponding local key
         local_key_data = await self.get_e2ee_self_key_data_by_key_id(server_key_id)
         if not local_key_data:
-            await logger.awarning(
+            logger.warning(
                 f"[E2EE] No local key found for server key_id={server_key_id}. "
                 "This account may have been logged in on another device. "
                 "Generating new key..."
@@ -128,19 +128,17 @@ class E2EE:
         derived_pub_key = crypto_scalarmult_base(local_priv_key)
 
         if derived_pub_key != local_pub_key:
-            await logger.aerror(
+            logger.error(
                 "[E2EE] Local key pair is corrupted - derived pubkey doesn't match stored pubkey"
             )
             return await self._generate_and_register_e2ee_key()
 
         if derived_pub_key != server_pub_key_data:
-            await logger.awarning(
-                "[E2EE] Local public key doesn't match server, registering local key"
-            )
+            logger.warning("[E2EE] Local public key doesn't match server, registering local key")
             # Register our local key to the server
             return await self._register_local_e2ee_key(local_key_data)
 
-        await logger.adebug(f"[E2EE] Key verification successful - key_id={server_key_id}")
+        logger.debug(f"[E2EE] Key verification successful - key_id={server_key_id}")
         return False
 
     async def _generate_and_register_e2ee_key(self) -> bool:
@@ -162,7 +160,7 @@ class E2EE:
         version = 1
         created_time = int(time.time() * 1000)
 
-        await logger.adebug(f"[E2EE] Registering new E2EE key with key_id={key_id}")
+        logger.debug(f"[E2EE] Registering new E2EE key with key_id={key_id}")
 
         try:
             result = await self.client.talk.register_e2ee_public_key(
@@ -186,10 +184,10 @@ class E2EE:
             await self.save_e2ee_self_key_data_by_key_id(registered_key_id, key_data)
             await self.save_e2ee_self_key_data(key_data)
 
-            await logger.ainfo(f"[E2EE] Registered new E2EE key_id={registered_key_id}")
+            logger.info(f"[E2EE] Registered new E2EE key_id={registered_key_id}")
             return True
         except Exception as e:
-            await logger.aerror(f"[E2EE] Failed to register E2EE key: {e}")
+            logger.error(f"[E2EE] Failed to register E2EE key: {e}")
             return False
 
     async def _register_local_e2ee_key(self, local_key_data: dict) -> bool:
@@ -210,7 +208,7 @@ class E2EE:
 
         req_seq = await self.client.get_reqseq()
 
-        await logger.adebug(f"[E2EE] Registering local E2EE key with key_id={key_id}")
+        logger.debug(f"[E2EE] Registering local E2EE key with key_id={key_id}")
 
         try:
             result = await self.client.talk.register_e2ee_public_key(
@@ -222,7 +220,7 @@ class E2EE:
             )
 
             registered_key_id = result.get(2) or result.get("keyId") or key_id
-            await logger.ainfo(f"[E2EE] Registered local E2EE key_id={registered_key_id}")
+            logger.info(f"[E2EE] Registered local E2EE key_id={registered_key_id}")
 
             # Update local storage if key_id changed
             if registered_key_id != key_id:
@@ -232,7 +230,7 @@ class E2EE:
 
             return True
         except Exception as e:
-            await logger.aerror(f"[E2EE] Failed to register local E2EE key: {e}")
+            logger.error(f"[E2EE] Failed to register local E2EE key: {e}")
             return False
 
     async def get_e2ee_local_public_key(
@@ -335,9 +333,7 @@ class E2EE:
                             group_key_id=key_id,
                         )
                     except Exception as e:
-                        await logger.adebug(
-                            f"[E2EE] Failed to get group key {key_id}: {e}, falling back"
-                        )
+                        logger.debug(f"[E2EE] Failed to get group key {key_id}: {e}, falling back")
                         e2ee_group_shared_key = None
 
                 # Fall back to getting the last key
@@ -365,12 +361,12 @@ class E2EE:
                             should_register = "not_found" in error_str or "not found" in error_str
 
                         if should_register:
-                            await logger.adebug(
+                            logger.debug(
                                 f"[E2EE] Group key not found for {mid[:20]}..., registering"
                             )
                             return await self.try_register_e2ee_group_key(mid)
                         else:
-                            await logger.aerror(f"[E2EE] Failed to get group shared key: {e}")
+                            logger.error(f"[E2EE] Failed to get group shared key: {e}")
                             raise
 
                 # Pb1_U3 struct fields:
@@ -403,7 +399,7 @@ class E2EE:
                 self_key_data = await self.get_e2ee_self_key_data_by_key_id(receiver_key_id)
                 if self_key_data is None:
                     # The group key was encrypted for a key ID we no longer have
-                    await logger.adebug(
+                    logger.debug(
                         f"[E2EE] Self key not found for key_id={receiver_key_id}, registering"
                     )
                     return await self.try_register_e2ee_group_key(mid)
@@ -418,9 +414,7 @@ class E2EE:
                                 creator, creator_key_id, skip_cache=skip_cache
                             )
                         except Exception as key_error:
-                            await logger.awarning(
-                                f"[E2EE] Failed to get creator's key: {key_error}"
-                            )
+                            logger.warning(f"[E2EE] Failed to get creator's key: {key_error}")
                             raise
 
                         if not isinstance(creator_key_data, bytes):
@@ -455,12 +449,10 @@ class E2EE:
                         return data
                     except Exception as decrypt_error:
                         if attempt == 0:
-                            await logger.adebug(f"[E2EE] Decrypt failed, retrying: {decrypt_error}")
+                            logger.debug(f"[E2EE] Decrypt failed, retrying: {decrypt_error}")
                             continue
                         else:
-                            await logger.adebug(
-                                f"[E2EE] Decrypt failed after retry: {decrypt_error}"
-                            )
+                            logger.debug(f"[E2EE] Decrypt failed after retry: {decrypt_error}")
                             break
 
                 # Both attempts failed, register new group key
@@ -557,7 +549,7 @@ class E2EE:
             if member_key_version is not None and member_key_version < detected_key_version:
                 detected_key_version = member_key_version
 
-        await logger.adebug(f"[E2EE] Using key_version={detected_key_version} for group key")
+        logger.debug(f"[E2EE] Using key_version={detected_key_version} for group key")
 
         for mid, key_info in e2ee_public_keys.items():
             # Get keyId and keyData - try numeric fields first
@@ -602,7 +594,7 @@ class E2EE:
         if group_key_id is None:
             # If not in response, we need to fetch it
             # This shouldn't happen normally but handle it gracefully
-            await logger.awarning(
+            logger.warning(
                 "[E2EE] registerE2EEGroupKey response missing groupKeyId, "
                 "will fetch from server on next use"
             )
@@ -614,7 +606,7 @@ class E2EE:
             "keyId": group_key_id,
         }
         await self.client.storage.set(f"e2eeGroupKeys:{chat_mid}", json.dumps(data))
-        await logger.ainfo(f"[E2EE] Registered new group key, keyId={group_key_id}")
+        logger.info(f"[E2EE] Registered new group key, keyId={group_key_id}")
 
         return data
 
@@ -754,7 +746,7 @@ class E2EE:
         sender_key_id = int(self_key_data["keyId"])
         to_type = self.client.get_to_type(to)
 
-        await logger.adebug(f"[E2EE.encrypt] to_type={to_type}")
+        logger.debug(f"[E2EE.encrypt] to_type={to_type}")
 
         if to_type == 0:  # User
             private_key = b64decode(self_key_data["privKey"])
@@ -965,7 +957,7 @@ class E2EE:
         except ValueError as e:
             # MAC check failed - possibly stale cached key
             if "MAC check failed" in str(e) and from_ != my_mid and to_type not in ("USER", 0):
-                await logger.adebug("[E2EE.decrypt] MAC check failed, retrying with fresh key")
+                logger.debug("[E2EE.decrypt] MAC check failed, retrying with fresh key")
                 # Clear cache and retry
                 sender_pub = await self.get_e2ee_local_public_key(
                     from_, sender_key_id, skip_cache=True
@@ -1001,11 +993,9 @@ class E2EE:
                             try:
                                 await self.try_register_e2ee_group_key(to)
                                 self._recent_group_key_registrations[to] = now
-                                await logger.adebug("[E2EE.decrypt] New group key registered")
+                                logger.debug("[E2EE.decrypt] New group key registered")
                             except Exception as reg_error:
-                                await logger.adebug(
-                                    f"[E2EE.decrypt] Failed to register: {reg_error}"
-                                )
+                                logger.debug(f"[E2EE.decrypt] Failed to register: {reg_error}")
 
                         # Re-raise the original error - this message cannot be decrypted
                         raise retry_error

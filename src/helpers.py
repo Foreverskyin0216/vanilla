@@ -147,11 +147,9 @@ async def fetch_sticker_image(sticker_id: str) -> bytes | None:
             response = await client.get(url)
             if response.status_code == 200:
                 return response.content
-            await logger.awarning(
-                f"Failed to fetch sticker {sticker_id}: HTTP {response.status_code}"
-            )
+            logger.warning(f"Failed to fetch sticker {sticker_id}: HTTP {response.status_code}")
     except Exception as e:
-        await logger.awarning(f"Error fetching sticker {sticker_id}: {e}")
+        logger.warning(f"Error fetching sticker {sticker_id}: {e}")
     return None
 
 
@@ -229,7 +227,7 @@ async def analyze_sticker_with_vision(sticker_id: str, sticker_text: str = "") -
             return f"{description} ({sticker_text})"
         return description
     except Exception as e:
-        await logger.awarning(f"Vision analysis failed for sticker {sticker_id}: {e}")
+        logger.warning(f"Vision analysis failed for sticker {sticker_id}: {e}")
         # Fallback to alt text
         if sticker_text:
             return sticker_text
@@ -484,7 +482,7 @@ async def _add_member(context: ChatContext) -> None:
         await _add_talk_member(context)
 
 
-async def _add_chat_message(context: ChatContext) -> None:
+def _add_chat_message(context: ChatContext) -> None:
     """Add a message to the chat's message history (unified for Square and Talk)."""
     if not context.event:
         return
@@ -532,7 +530,7 @@ async def _add_chat_message(context: ChatContext) -> None:
         if not text and e2ee_version and has_chunks:
             # Message was E2EE encrypted but couldn't be decrypted
             text = "[訊息已加密，無法讀取內容]"
-            await logger.awarning("E2EE message could not be decrypted - using placeholder text")
+            logger.warning("E2EE message could not be decrypted - using placeholder text")
 
     new_message = HumanMessage(content=f"{member_name}: {text}")
 
@@ -562,7 +560,7 @@ def _add_chat(context: ChatContext) -> None:
 _add_square = _add_chat
 
 
-async def _is_mentioned(context: ChatContext) -> bool:
+def _is_mentioned(context: ChatContext) -> bool:
     """Check if the bot is mentioned in the message."""
     if not context.event:
         return False
@@ -572,7 +570,7 @@ async def _is_mentioned(context: ChatContext) -> bool:
 
     chat_data = context.chats.get(message_to)
     if not chat_data:
-        await logger.adebug("_is_mentioned: no chat_data")
+        logger.debug("_is_mentioned: no chat_data")
         return False
 
     # For Talk messages, also check if it's a direct message (DM)
@@ -663,15 +661,13 @@ async def update_chat_info(
     chat_data = context.chats.get(message_to)
     if chat_data and message_id:
         if chat_data.is_message_processed(message_id):
-            await logger.adebug(
-                f"update_chat_info: skipping duplicate message {message_id[:20]}..."
-            )
+            logger.debug(f"update_chat_info: skipping duplicate message {message_id[:20]}...")
             return Command(goto="__end__")
         # Mark as processed before any further handling
         chat_data.mark_message_processed(message_id)
 
     await _add_member(context)
-    await _add_chat_message(context)
+    _add_chat_message(context)
 
     # Check if this is the bot's own message
     if isinstance(context.event, SquareMessage):
@@ -683,7 +679,7 @@ async def update_chat_info(
         return Command(goto="__end__")
 
     # Check if mentioned or replied to
-    is_mentioned = await _is_mentioned(context)
+    is_mentioned = _is_mentioned(context)
     is_reply = _is_reply(context)
 
     # For stickers, only respond if it's a reply to bot's message
@@ -694,7 +690,7 @@ async def update_chat_info(
     elif not is_mentioned and not is_reply:
         return Command(goto="__end__")
 
-    await logger.ainfo(
+    logger.info(
         f"update_chat_info: triggered for '{message_text[:50]}...' from {message_from[:20]}..."
     )
     return Command(goto=["addReaction", "chat"])
@@ -839,7 +835,7 @@ async def chat(
     # This runs sticker vision analysis in parallel while the agent is being built
     messages = await resolve_pending_stickers(messages)
 
-    await logger.adebug(f"chat: invoking agent with {len(messages)} messages")
+    logger.debug(f"chat: invoking agent with {len(messages)} messages")
 
     # Invoke the agent
     result = await agent.ainvoke({"messages": messages})
@@ -857,7 +853,7 @@ async def chat(
 
     clean_answer = answer.replace(f"{bot_name}:", "").replace(f"{bot_name}：", "").strip()
 
-    await logger.ainfo(f"chat: response='{clean_answer[:80]}...'")
+    logger.info(f"chat: response='{clean_answer[:80]}...'")
 
     # Send reply
     try:
@@ -878,9 +874,9 @@ async def chat(
                 sent_message_id = result.get(4) or result.get("id")
         if sent_message_id:
             chat_data.bot_message_ids.add(sent_message_id)
-            await logger.adebug(f"chat: stored bot message ID {sent_message_id[:20]}...")
+            logger.debug(f"chat: stored bot message ID {sent_message_id[:20]}...")
     except Exception as e:
-        await logger.aerror(f"chat: reply failed: {e}")
+        logger.error(f"chat: reply failed: {e}")
 
     # Update state with response
     ai_response = AIMessage(content=clean_answer)

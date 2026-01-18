@@ -131,7 +131,7 @@ class TalkMessage:
                 metadata = self.content_metadata
                 e2ee = "e2eeVersion" in metadata if metadata else False
 
-        await logger.adebug(
+        logger.debug(
             f"reply: to_type={to_type} to_mid='{self.to_mid}' "
             f"from_mid='{self.from_mid}' id='{self.id}' e2ee={e2ee}"
         )
@@ -146,11 +146,9 @@ class TalkMessage:
         # Fallback: if to is empty, try to determine from MID prefix
         if not to:
             to = self.to_mid or self.from_mid
-            await logger.awarning(
-                f"to_type={to_type}, using fallback to={to[:20] if to else 'EMPTY'}..."
-            )
+            logger.warning(f"to_type={to_type}, using fallback to={to[:20] if to else 'EMPTY'}...")
 
-        await logger.adebug(f"reply: Final to='{to}' e2ee={e2ee}")
+        logger.debug(f"reply: Final to='{to}' e2ee={e2ee}")
 
         try:
             return await self._client.base.talk.send_message(
@@ -164,7 +162,7 @@ class TalkMessage:
         except Exception as e:
             # If E2EE encryption failed, try without E2EE
             if e2ee:
-                await logger.awarning(f"E2EE send failed: {e}, retrying without E2EE...")
+                logger.warning(f"E2EE send failed: {e}, retrying without E2EE...")
                 return await self._client.base.talk.send_message(
                     to=to,
                     text=text,
@@ -1045,7 +1043,7 @@ class Client(TypedEventEmitter):
 
     async def _listen_talk(self) -> None:
         """Listen to Talk events."""
-        await logger.ainfo("[Talk] Event listener started")
+        logger.info("[Talk] Event listener started")
         revision = 0
         global_rev = 0
         individual_rev = 0
@@ -1137,7 +1135,7 @@ class Client(TypedEventEmitter):
                                 message = await self.base.e2ee.decrypt_e2ee_message(message)
                             except Exception as e:
                                 # Log E2EE decryption error but still emit the message
-                                await logger.awarning(f"[Talk] E2EE decrypt failed: {e}")
+                                logger.warning(f"[Talk] E2EE decrypt failed: {e}")
 
                         self.emit("message", TalkMessage(message, self))
 
@@ -1175,7 +1173,7 @@ class Client(TypedEventEmitter):
         # Thrift field ID for SquareEventNotificationMessage.squareMessage
         NOTIFICATION_FIELD_SQUARE_MESSAGE = 2
 
-        await logger.ainfo("[Square] Event listener started")
+        logger.info("[Square] Event listener started")
 
         while self.base.auth_token:
             try:
@@ -1189,8 +1187,8 @@ class Client(TypedEventEmitter):
                 consecutive_errors = 0
 
                 # Extract syncToken (field 3) and continuationToken (field 4)
-                sync_token = result.get(FIELD_SYNC_TOKEN)
-                continuation_token = result.get(FIELD_CONTINUATION_TOKEN)
+                new_sync_token = result.get(FIELD_SYNC_TOKEN)
+                new_continuation_token = result.get(FIELD_CONTINUATION_TOKEN)
 
                 # Extract subscription.subscriptionId (field 1, then subscriptionId)
                 subscription = result.get(FIELD_SUBSCRIPTION, {})
@@ -1216,8 +1214,21 @@ class Client(TypedEventEmitter):
                         if sq_msg:
                             self.emit("square:message", SquareMessage(sq_msg, self))
 
+                # Handle pagination: if there's a continuation token, keep fetching
+                # until all pending events are retrieved before going to long polling
+                if new_continuation_token:
+                    # More events to fetch - use continuation token
+                    continuation_token = new_continuation_token
+                    # Update sync token if provided
+                    if new_sync_token:
+                        sync_token = new_sync_token
+                else:
+                    # No more pending events - reset continuation token and update sync token
+                    continuation_token = None
+                    if new_sync_token:
+                        sync_token = new_sync_token
+
                 # No sleep needed - long polling returns immediately when events available
-                # Only add minimal delay to prevent tight loop on empty responses
 
             except Exception as e:
                 consecutive_errors += 1
@@ -1226,11 +1237,11 @@ class Client(TypedEventEmitter):
                 # Check if this is a persistent API error
                 error_msg = str(e)
                 if consecutive_errors >= max_consecutive_errors:
-                    await logger.aerror(
+                    logger.error(
                         f"[Square] Stopping listener after {consecutive_errors} consecutive errors. "
                         f"Last error: {error_msg}"
                     )
-                    await logger.aerror(
+                    logger.error(
                         "[Square] This may indicate the account has no Squares or "
                         "the device type doesn't support Square API."
                     )
@@ -1378,9 +1389,9 @@ async def login_with_password(
         # Check if this is an internal error (code 20) which often means rate limiting
         error_code = e.data.get("code") if e.data else None
         if error_code == 20 and fallback_to_qr:
-            await logger.awarning("Password login failed (Internal Error - likely rate limited)")
-            await logger.ainfo("Falling back to QR code login...")
-            await logger.ainfo("Please scan the QR code with your LINE mobile app.")
+            logger.warning("Password login failed (Internal Error - likely rate limited)")
+            logger.info("Falling back to QR code login...")
+            logger.info("Please scan the QR code with your LINE mobile app.")
 
             # Fall back to QR login
             if not on_qr_url:
