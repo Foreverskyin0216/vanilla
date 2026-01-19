@@ -490,14 +490,20 @@ def _add_chat_message(context: ChatContext) -> None:
     bot_name = context.bot_name
     message_to, message_from, message_text, raw = _get_message_data(context)
 
-    # Find member name
+    # Find member name and create a unique identifier
+    # Format: "DisplayName#abc123" where abc123 is the first 6 chars of the member ID
+    # This helps distinguish between users with the same display name
     member_name = message_from
+    short_member_id = message_from[:6] if message_from else ""
     chat_data = context.chats.get(message_to)
     if chat_data:
         for member in chat_data.members:
             if member.id == message_from:
                 member_name = member.name
                 break
+
+    # Combine display name with short ID for unique identification
+    member_identifier = f"{member_name}#{short_member_id}"
 
     # Handle different content types
     content_type = _get_content_type(raw)
@@ -532,7 +538,7 @@ def _add_chat_message(context: ChatContext) -> None:
             text = "[訊息已加密，無法讀取內容]"
             logger.warning("E2EE message could not be decrypted - using placeholder text")
 
-    new_message = HumanMessage(content=f"{member_name}: {text}")
+    new_message = HumanMessage(content=f"{member_identifier}: {text}")
 
     # Extract message ID using both numeric field ID and string key
     message_id = raw.get(_MSG_FIELD_ID) or raw.get("id", "")
@@ -621,11 +627,6 @@ async def _is_reply(context: ChatContext) -> bool:
 
     chat_data = context.chats.get(message_to)
     if not related_message_id or not chat_data:
-        return False
-
-    # Check if sender is a known member
-    is_known_member = any(m.id == message_from for m in chat_data.members)
-    if not is_known_member:
         return False
 
     # Check if replying to one of the bot's messages (fast path)

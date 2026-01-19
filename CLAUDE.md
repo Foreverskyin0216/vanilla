@@ -101,7 +101,7 @@ vanilla/
 
 - Chat member and message management utilities (unified for Square and Talk)
 - `_add_chat`, `_add_member`, `_add_chat_message` - Unified state management
-- Mention and reply detection: `_is_mentioned`, `_is_reply`
+- Mention and reply detection: `_is_mentioned`, `_is_reply` (reply detection works even for uncached members)
 - Content type handling: `_get_content_type`, `_get_sticker_info`
 - Sticker vision analysis: `analyze_sticker_with_vision` - Uses GPT-4 Vision to analyze sticker images
 - Sticker image fetching: `fetch_sticker_image`, `get_sticker_image_url` - Fetches sticker images from LINE CDN
@@ -189,7 +189,11 @@ vanilla/
   - Rule types: `nickname`, `trigger`, `behavior`, `custom`
 - `get_user_preferences`: List all preferences for the current user (requires preferences_store)
 - `delete_user_preference`: Delete a preference by type and key (requires preferences_store)
-- Factory function `create_tools(search, scheduler?, chat_id?, preferences_store?, user_id?)` for tool instantiation
+- `set_nickname_for_user`: Set a nickname for another user in the chat (requires preferences_store, members)
+  - Parameters: `target_user_identifier`, `nickname`
+  - Target user identifier format: `DisplayName#abc123` (name + first 6 chars of user ID)
+  - Allows User A to set a nickname for User B
+- Factory function `create_tools(search, scheduler?, chat_id?, preferences_store?, user_id?, members?)` for tool instantiation
 
 **Types** (`src/types.py`):
 
@@ -220,7 +224,10 @@ vanilla/
 ### State Management
 
 - Per-chat conversation state via `SquareData` dataclass
-- Per-member tracking with name and message history
+- Per-member tracking with name, ID, and message history
+- **Member identifier format**: Messages include `DisplayName#abc123` format for unique user identification
+  - The `#abc123` suffix is the first 6 characters of the user's LINE ID
+  - This helps distinguish users with the same display name in multi-user chats
 - Bot ID tracking for mention and reply detection
 - Async PostgreSQL checkpointer for state persistence
 

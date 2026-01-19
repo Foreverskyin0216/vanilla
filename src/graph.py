@@ -72,6 +72,10 @@ def build_chat_agent(
     """
     from src import prompts
 
+    # Get members list from chat data for cross-user preference lookup
+    chat_data = context.chats.get(chat_id)
+    members = chat_data.members if chat_data else []
+
     # Create tools for this context
     tools = create_tools(
         context.search,
@@ -79,6 +83,7 @@ def build_chat_agent(
         chat_id=chat_id,
         preferences_store=context.preferences_store,
         user_id=user_id,
+        members=members,
     )
 
     # Create summarization middleware
