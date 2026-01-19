@@ -11,6 +11,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from src.checkpoint_cleanup import cleanup_old_checkpoints
 from src.graph import VanillaContext, build_graph
+from src.helpers import should_trigger_response
 from src.linepy import Client, SquareMessage, TalkMessage, login_with_password
 from src.logging import get_logger
 from src.preferences import UserPreferencesStore
@@ -154,6 +155,11 @@ class ChatBot:
                 chat_id=thread_id,
             )
 
+            # Check if this message will trigger a bot response
+            # Only enable Langfuse tracing for messages that trigger responses
+            will_trigger = await should_trigger_response(chat_context)
+            callbacks = [self.langfuse_handler] if will_trigger else []
+
             # Set a timeout for the entire graph invocation to prevent blocking
             # the message worker indefinitely
             try:
@@ -161,7 +167,7 @@ class ChatBot:
                     self.app.ainvoke(
                         {"messages": [HumanMessage(content=event.text)]},
                         config={
-                            "callbacks": [self.langfuse_handler],
+                            "callbacks": callbacks,
                             "configurable": {"thread_id": thread_id},
                         },
                         context=vanilla_context,

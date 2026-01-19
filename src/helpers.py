@@ -674,6 +674,50 @@ async def _is_reply(context: ChatContext) -> bool:
     return False
 
 
+async def should_trigger_response(context: ChatContext) -> bool:
+    """
+    Check if a message should trigger a bot response.
+
+    This is a lightweight pre-check that can be used before graph invocation
+    to determine if Langfuse tracing should be enabled. It does NOT modify
+    any state (unlike update_chat_info which adds chat/member data).
+
+    Args:
+        context: Chat context with event data.
+
+    Returns:
+        True if the message should trigger a response, False otherwise.
+    """
+    if not context.event:
+        return False
+
+    _, _, _, raw = _get_message_data(context)
+    content_type = _get_content_type(raw)
+
+    # Only process text messages and stickers
+    if content_type not in (CONTENT_TYPE_NONE, CONTENT_TYPE_STICKER):
+        return False
+
+    # Check if this is the bot's own message
+    if isinstance(context.event, SquareMessage):
+        is_bot_message = await context.event.is_my_message()
+    else:
+        is_bot_message = context.event.is_my_message
+
+    if is_bot_message:
+        return False
+
+    # Check trigger conditions
+    is_mentioned = _is_mentioned(context)
+    is_reply = await _is_reply(context)
+
+    # For stickers, only respond if it's a reply to bot's message
+    if content_type == CONTENT_TYPE_STICKER:
+        return is_reply
+    else:
+        return is_mentioned or is_reply
+
+
 async def update_chat_info(
     state: MessagesState, runtime: Runtime["VanillaContext"]
 ) -> Command[Literal["addReaction", "chat", "__end__"]]:
