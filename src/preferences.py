@@ -137,7 +137,7 @@ class UserPreferencesStore:
         now = datetime.now(tz)
 
         # Check if preference exists
-        existing = await self.get_preference(user_id, rule_type, rule_key, chat_id)
+        existing = await self.get_preference(user_id, chat_id, rule_type, rule_key)
 
         if existing:
             # Update existing preference
