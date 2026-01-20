@@ -251,9 +251,10 @@ class SquareMessage:
     _MSG_FIELD_CONTENT_TYPE = 15
     _MSG_FIELD_CONTENT_METADATA = 18
 
-    def __init__(self, raw: dict, client: "Client"):
+    def __init__(self, raw: dict, client: "Client", sender_display_name: str = ""):
         self._raw = raw
         self._client = client
+        self._sender_display_name = sender_display_name
 
     def _get_message(self) -> dict:
         """Get the inner Message struct."""
@@ -282,6 +283,11 @@ class SquareMessage:
         """Get the sender's Square member MID."""
         msg = self._get_message()
         return msg.get(self._MSG_FIELD_FROM) or msg.get("from", "")
+
+    @property
+    def sender_display_name(self) -> str:
+        """Get the sender's display name from event notification."""
+        return self._sender_display_name
 
     @property
     def square_chat_mid(self) -> str:
@@ -1232,8 +1238,14 @@ class Client(TypedEventEmitter):
         # Thrift field ID for SquareEventPayload.notificationMessage
         PAYLOAD_NOTIFICATION_MESSAGE = 30
 
-        # Thrift field ID for SquareEventNotificationMessage.squareMessage
-        NOTIFICATION_FIELD_SQUARE_MESSAGE = 2
+        # Thrift field IDs for SquareEventNotificationMessage
+        # Note: linejs uses fid 3 for squareMessage and fid 4 for senderDisplayName
+        # winbotscript/line-protocol uses fid 2 and 3 respectively
+        # We try both to support different protocol versions
+        NOTIFICATION_FIELD_SQUARE_MESSAGE_V1 = 2  # winbotscript
+        NOTIFICATION_FIELD_SQUARE_MESSAGE_V2 = 3  # linejs
+        NOTIFICATION_FIELD_SENDER_DISPLAY_NAME_V1 = 3  # winbotscript
+        NOTIFICATION_FIELD_SENDER_DISPLAY_NAME_V2 = 4  # linejs
 
         logger.info("[Square] Event listener started")
 
@@ -1271,10 +1283,19 @@ class Client(TypedEventEmitter):
                     if event_type == NOTIFICATION_MESSAGE:
                         # Get notificationMessage (field 30)
                         notification_msg = payload.get(PAYLOAD_NOTIFICATION_MESSAGE, {})
-                        # Get squareMessage (field 2)
-                        sq_msg = notification_msg.get(NOTIFICATION_FIELD_SQUARE_MESSAGE)
+                        # Get squareMessage - try both field IDs for protocol compatibility
+                        sq_msg = notification_msg.get(
+                            NOTIFICATION_FIELD_SQUARE_MESSAGE_V1
+                        ) or notification_msg.get(NOTIFICATION_FIELD_SQUARE_MESSAGE_V2)
+                        # Get senderDisplayName - try both field IDs for protocol compatibility
+                        sender_display_name = notification_msg.get(
+                            NOTIFICATION_FIELD_SENDER_DISPLAY_NAME_V1, ""
+                        ) or notification_msg.get(NOTIFICATION_FIELD_SENDER_DISPLAY_NAME_V2, "")
                         if sq_msg:
-                            self.emit("square:message", SquareMessage(sq_msg, self))
+                            self.emit(
+                                "square:message",
+                                SquareMessage(sq_msg, self, sender_display_name),
+                            )
 
                 # Handle pagination: if there's a continuation token, keep fetching
                 # until all pending events are retrieved before going to long polling

@@ -206,8 +206,14 @@ class LineServer:
         # Thrift field ID for SquareEventPayload.notificationMessage
         PAYLOAD_NOTIFICATION_MESSAGE = 30
 
-        # Thrift field ID for SquareEventNotificationMessage.squareMessage
-        NOTIFICATION_FIELD_SQUARE_MESSAGE = 2
+        # Thrift field IDs for SquareEventNotificationMessage
+        # Note: linejs uses fid 3 for squareMessage and fid 4 for senderDisplayName
+        # winbotscript/line-protocol uses fid 2 and 3 respectively
+        # We try both to support different protocol versions
+        NOTIFICATION_FIELD_SQUARE_MESSAGE_V1 = 2  # winbotscript
+        NOTIFICATION_FIELD_SQUARE_MESSAGE_V2 = 3  # linejs
+        NOTIFICATION_FIELD_SENDER_DISPLAY_NAME_V1 = 3  # winbotscript
+        NOTIFICATION_FIELD_SENDER_DISPLAY_NAME_V2 = 4  # linejs
 
         while self.client.base.auth_token:
             try:
@@ -236,10 +242,16 @@ class LineServer:
                     if event_type == NOTIFICATION_MESSAGE:
                         # Get notificationMessage (field 30)
                         notification_msg = payload.get(PAYLOAD_NOTIFICATION_MESSAGE, {})
-                        # Get squareMessage (field 2)
-                        sq_msg = notification_msg.get(NOTIFICATION_FIELD_SQUARE_MESSAGE)
+                        # Get squareMessage - try both field IDs for protocol compatibility
+                        sq_msg = notification_msg.get(
+                            NOTIFICATION_FIELD_SQUARE_MESSAGE_V1
+                        ) or notification_msg.get(NOTIFICATION_FIELD_SQUARE_MESSAGE_V2)
+                        # Get senderDisplayName - try both field IDs for protocol compatibility
+                        sender_display_name = notification_msg.get(
+                            NOTIFICATION_FIELD_SENDER_DISPLAY_NAME_V1, ""
+                        ) or notification_msg.get(NOTIFICATION_FIELD_SENDER_DISPLAY_NAME_V2, "")
                         if sq_msg:
-                            msg = SquareMessage(sq_msg, self.client)
+                            msg = SquareMessage(sq_msg, self.client, sender_display_name)
                             await self._emit("square:message", self._serialize_square_message(msg))
 
                 await asyncio.sleep(0.5)

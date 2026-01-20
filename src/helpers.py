@@ -362,21 +362,35 @@ def _get_message_data(context: ChatContext) -> tuple[str, str, str, dict]:
 async def _get_square_member(context: ChatContext) -> dict | None:
     """Get the Square member who sent the message.
 
-    Uses the getSquareMember API directly for efficiency and reliability,
-    rather than fetching all chat members and searching through them.
+    Uses getSquareChatMembers API to fetch all members and find the sender.
     """
     if not context.event or context.chat_type != "square":
         return None
 
-    _, message_from, _, _ = _get_message_data(context)
+    message_to, message_from, _, _ = _get_message_data(context)
 
     try:
-        # Use getSquareMember API directly - more efficient than fetching all members
-        # GetSquareMemberResponse: field 1 = squareMember (SquareMember struct)
-        response = await context.client.base.square.get_square_member(message_from)
-        # Extract the SquareMember from the response
-        square_member = response.get(1) or response.get("squareMember")
-        return square_member
+        chat = await context.client.get_square_chat(message_to)
+        members = await chat.get_members()
+
+        logger.info(f"_get_square_member: got {len(members)} members from API")
+        if members and len(members) > 0:
+            # Log the structure of the first member for debugging
+            first_member = members[0]
+            logger.info(f"_get_square_member: first member keys={list(first_member.keys())}")
+            logger.info(f"_get_square_member: first member data={first_member}")
+
+        for member in members:
+            # Try numeric field ID first (1), then string key for compatibility
+            member_mid = member.get(_SQUARE_MEMBER_FIELD_MID) or member.get("squareMemberMid")
+            if member_mid == message_from:
+                logger.info(f"_get_square_member: found member, keys={list(member.keys())}")
+                logger.info(f"_get_square_member: found member data={member}")
+                return member
+        logger.warning(
+            f"_get_square_member: member {message_from[:20]}... not found in {len(members)} members"
+        )
+        return None
     except Exception as e:
         logger.warning(f"_get_square_member: API call failed for {message_from[:20]}...: {e}")
         return None
@@ -398,23 +412,32 @@ async def _add_square_member(context: ChatContext) -> None:
         logger.debug(f"_add_square_member: member {message_from[:20]}... already cached")
         return
 
-    square_member = await _get_square_member(context)
+    display_name = ""
 
-    # Get display name from API response, or use member ID as fallback
-    if square_member:
-        # Try numeric field ID first (3), then string key for compatibility
-        display_name = square_member.get(_SQUARE_MEMBER_FIELD_DISPLAY_NAME) or square_member.get(
-            "displayName", ""
-        )
+    # First try: Get display name from event's sender_display_name (most efficient)
+    if isinstance(context.event, SquareMessage) and context.event.sender_display_name:
+        display_name = context.event.sender_display_name
         logger.debug(
-            f"_add_square_member: got display_name='{display_name}' for {message_from[:20]}..."
+            f"_add_square_member: got display_name='{display_name}' from event for {message_from[:20]}..."
         )
-    else:
-        # Fallback to member ID if API call failed
-        display_name = ""
-        logger.warning(f"_add_square_member: failed to get member info for {message_from[:20]}...")
 
-    # Use member ID as display name if empty
+    # Second try: Fall back to API call if event doesn't have sender_display_name
+    if not display_name:
+        square_member = await _get_square_member(context)
+        if square_member:
+            # Try numeric field ID first (3), then string key for compatibility
+            display_name = square_member.get(
+                _SQUARE_MEMBER_FIELD_DISPLAY_NAME
+            ) or square_member.get("displayName", "")
+            logger.debug(
+                f"_add_square_member: got display_name='{display_name}' from API for {message_from[:20]}..."
+            )
+        else:
+            logger.warning(
+                f"_add_square_member: failed to get member info for {message_from[:20]}..."
+            )
+
+    # Use member ID as display name if still empty
     if not display_name:
         display_name = message_from
         logger.warning(

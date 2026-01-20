@@ -332,9 +332,15 @@ class SquareService:
         )
 
     async def get_square_member(self, square_member_mid: str) -> dict:
-        """Get Square member information."""
+        """Get Square member information.
+
+        Note: This API may not work as expected. Use get_square_chat_members instead.
+
+        GetSquareMemberRequest thrift struct:
+            2: string squareMemberMid
+        """
         return await self.client.request.request(
-            [[12, 1, [[11, 1, square_member_mid]]]],
+            [[12, 1, [[11, 2, square_member_mid]]]],
             "getSquareMember",
             self.protocol_type,
             True,
