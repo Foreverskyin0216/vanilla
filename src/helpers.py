@@ -918,7 +918,7 @@ async def chat(
 
     # Build the chat agent with SummarizationMiddleware
     # Pass user_id (message_from) for user preference tools
-    agent = build_chat_agent(context, chat_id, user_id=message_from)
+    agent = await build_chat_agent(context, chat_id, user_id=message_from)
 
     # Build messages for the agent
     messages = []

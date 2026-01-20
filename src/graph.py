@@ -9,6 +9,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import MessagesState, StateGraph
 
 from src.helpers import add_reaction, chat, update_chat_info
+from src.preferences import format_preferences_for_prompt
 from src.tools import create_tools
 
 if TYPE_CHECKING:
@@ -51,7 +52,7 @@ def build_graph(checkpointer: BaseCheckpointSaver):
     return graph.compile(checkpointer=checkpointer)
 
 
-def build_chat_agent(
+async def build_chat_agent(
     context: "ChatContext",
     chat_id: str,
     user_id: str | None = None,
@@ -95,6 +96,24 @@ def build_chat_agent(
 
     # Build the agent with middleware
     system_prompt = prompts.VANILLA_PERSONALITY.format(bot_name=context.bot_name)
+
+    # Fetch and inject user preferences for all members in this chat
+    if context.preferences_store and members:
+        pref_sections = []
+        for member in members:
+            prefs = await context.preferences_store.get_preferences_for_user(member.id, chat_id)
+            if prefs:
+                # Use format_preferences_for_prompt and add member context
+                formatted = format_preferences_for_prompt(prefs)
+                # Replace the generic header with member-specific header
+                formatted = formatted.replace(
+                    "此用戶有以下個人偏好規則，請務必遵守：",
+                    f"【{member.name}】的偏好：",
+                )
+                pref_sections.append(formatted)
+
+        if pref_sections:
+            system_prompt += "\n\n此聊天室中的用戶偏好規則：\n" + "\n".join(pref_sections)
 
     agent = create_agent(
         model="openai:gpt-4.1",
