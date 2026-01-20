@@ -247,3 +247,391 @@ async def test_websearch_tool_regular_search():
 
     assert "Search Results" in result
     mock_search.search.assert_called_once()
+
+
+# =============================================================================
+# Tests for scheduler tools with flexible search
+# =============================================================================
+
+
+class TestSchedulerToolsSearch:
+    """Tests for scheduler tools with flexible search capabilities."""
+
+    def setup_method(self):
+        """Set up mock scheduler with test tasks."""
+        from dataclasses import dataclass
+
+        @dataclass
+        class MockTask:
+            id: str
+            chat_id: str
+            message: str
+            status: str
+            description: str | None = None
+            cron_expression: str = "0 9 * * *"
+
+            def to_readable_string(self):
+                return f"Task: {self.description or self.message}"
+
+        self.mock_search = MagicMock()
+        self.mock_scheduler = MagicMock()
+        self.chat_id = "test_chat_123"
+
+        # Create test tasks
+        self.task1 = MockTask(
+            id="abc12345-1234-5678-9012-345678901234",
+            chat_id=self.chat_id,
+            message="早安訊息",
+            description="每日早安提醒",
+            status="pending",
+        )
+        self.task2 = MockTask(
+            id="def67890-1234-5678-9012-345678901234",
+            chat_id=self.chat_id,
+            message="晚安訊息",
+            description="每日晚安提醒",
+            status="pending",
+        )
+        self.task3 = MockTask(
+            id="ghi11111-1234-5678-9012-345678901234",
+            chat_id=self.chat_id,
+            message="午餐提醒",
+            description=None,
+            status="pending",
+        )
+        self.task4 = MockTask(
+            id="jkl22222-1234-5678-9012-345678901234",
+            chat_id="other_chat",  # Different chat
+            message="其他群組訊息",
+            description="其他群組",
+            status="pending",
+        )
+        self.task5 = MockTask(
+            id="mno33333-1234-5678-9012-345678901234",
+            chat_id=self.chat_id,
+            message="已取消任務",
+            description="已取消",
+            status="cancelled",
+        )
+
+        self.mock_scheduler.tasks = {
+            self.task1.id: self.task1,
+            self.task2.id: self.task2,
+            self.task3.id: self.task3,
+            self.task4.id: self.task4,
+            self.task5.id: self.task5,
+        }
+        self.mock_scheduler.cancel_task = AsyncMock(return_value=True)
+        self.mock_scheduler.update_task = AsyncMock(return_value=self.task1)
+        self.mock_scheduler.list_tasks = MagicMock(return_value="Task list")
+
+    def _get_tools(self):
+        """Get tools with mock scheduler."""
+        return create_tools(self.mock_search, self.mock_scheduler, self.chat_id)
+
+    def _get_cancel_tool(self):
+        """Get the cancel_scheduled_task tool."""
+        tools = self._get_tools()
+        return next(t for t in tools if t.name == "cancel_scheduled_task")
+
+    def _get_update_tool(self):
+        """Get the update_scheduled_task tool."""
+        tools = self._get_tools()
+        return next(t for t in tools if t.name == "update_scheduled_task")
+
+    @pytest.mark.asyncio
+    async def test_cancel_by_id(self):
+        """Test canceling task by ID."""
+        tool = self._get_cancel_tool()
+        result = await tool.ainvoke({"search": "abc12345"})
+        assert "任務已取消" in result
+        self.mock_scheduler.cancel_task.assert_called_once_with(self.task1.id)
+
+    @pytest.mark.asyncio
+    async def test_cancel_by_description(self):
+        """Test canceling task by description search."""
+        tool = self._get_cancel_tool()
+        result = await tool.ainvoke({"search": "早安提醒"})
+        assert "任務已取消" in result
+        self.mock_scheduler.cancel_task.assert_called_once_with(self.task1.id)
+
+    @pytest.mark.asyncio
+    async def test_cancel_by_message_content(self):
+        """Test canceling task by message content search."""
+        tool = self._get_cancel_tool()
+        result = await tool.ainvoke({"search": "午餐"})
+        assert "任務已取消" in result
+        self.mock_scheduler.cancel_task.assert_called_once_with(self.task3.id)
+
+    @pytest.mark.asyncio
+    async def test_cancel_not_found(self):
+        """Test canceling non-existent task."""
+        tool = self._get_cancel_tool()
+        result = await tool.ainvoke({"search": "不存在的任務"})
+        assert "找不到任務" in result
+
+    @pytest.mark.asyncio
+    async def test_cancel_multiple_matches(self):
+        """Test canceling with multiple matches shows options."""
+        tool = self._get_cancel_tool()
+        # "提醒" should match both task1 and task2
+        result = await tool.ainvoke({"search": "提醒"})
+        assert "找到多個匹配的任務" in result
+        assert "abc12345" in result or "def67890" in result
+
+    @pytest.mark.asyncio
+    async def test_cancel_ignores_other_chat(self):
+        """Test that tasks from other chats are not matched."""
+        tool = self._get_cancel_tool()
+        result = await tool.ainvoke({"search": "其他群組"})
+        assert "找不到任務" in result
+
+    @pytest.mark.asyncio
+    async def test_cancel_ignores_cancelled_tasks(self):
+        """Test that cancelled tasks are not matched."""
+        tool = self._get_cancel_tool()
+        result = await tool.ainvoke({"search": "已取消"})
+        assert "找不到任務" in result
+
+    @pytest.mark.asyncio
+    async def test_update_by_description(self):
+        """Test updating task by description search."""
+        tool = self._get_update_tool()
+        result = await tool.ainvoke({"search": "早安提醒", "message": "新的早安訊息"})
+        assert "任務已更新" in result
+        self.mock_scheduler.update_task.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_by_message_content(self):
+        """Test updating task by message content search."""
+        tool = self._get_update_tool()
+        result = await tool.ainvoke({"search": "午餐", "description": "新描述"})
+        assert "任務已更新" in result
+
+    @pytest.mark.asyncio
+    async def test_update_not_found(self):
+        """Test updating non-existent task."""
+        tool = self._get_update_tool()
+        result = await tool.ainvoke({"search": "不存在", "message": "新訊息"})
+        assert "找不到任務" in result
+
+    @pytest.mark.asyncio
+    async def test_update_requires_at_least_one_field(self):
+        """Test update requires at least one field to update."""
+        tool = self._get_update_tool()
+        result = await tool.ainvoke({"search": "早安"})
+        assert "Error" in result
+        assert "至少需要提供一個" in result
+
+
+# =============================================================================
+# Tests for preference tools with flexible search
+# =============================================================================
+
+
+class TestPreferenceToolsSearch:
+    """Tests for preference tools with flexible search capabilities."""
+
+    def setup_method(self):
+        """Set up mock preferences store."""
+        from dataclasses import dataclass
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        @dataclass
+        class MockPreference:
+            id: str
+            user_id: str
+            chat_id: str
+            rule_type: str
+            rule_key: str
+            rule_value: str
+            is_active: bool = True
+            created_at: datetime = None
+            updated_at: datetime = None
+
+            def __post_init__(self):
+                tz = ZoneInfo("Asia/Taipei")
+                self.created_at = self.created_at or datetime.now(tz)
+                self.updated_at = self.updated_at or datetime.now(tz)
+
+            def to_readable_string(self):
+                return f"ID: {self.id[:8]}\nType: {self.rule_type}\nKey: {self.rule_key}\nValue: {self.rule_value}"
+
+        self.mock_search = MagicMock()
+        self.mock_preferences_store = MagicMock()
+        self.user_id = "user_123"
+        self.chat_id = "chat_456"
+
+        # Create test preferences
+        self.pref1 = MockPreference(
+            id="pref-1111",
+            user_id=self.user_id,
+            chat_id=self.chat_id,
+            rule_type="nickname",
+            rule_key="call_me",
+            rule_value="小王爺",
+        )
+        self.pref2 = MockPreference(
+            id="pref-2222",
+            user_id=self.user_id,
+            chat_id=self.chat_id,
+            rule_type="trigger",
+            rule_key="greeting",
+            rule_value="晚安",
+        )
+        self.pref3 = MockPreference(
+            id="pref-3333",
+            user_id=self.user_id,
+            chat_id=self.chat_id,
+            rule_type="behavior",
+            rule_key="formality",
+            rule_value="不用敬語",
+        )
+
+        self.mock_preferences_store.get_preferences_for_user = AsyncMock(
+            return_value=[self.pref1, self.pref2, self.pref3]
+        )
+        self.mock_preferences_store.delete_preference = AsyncMock(return_value=True)
+        self.mock_preferences_store.set_preference = AsyncMock(return_value=self.pref1)
+
+    def _get_tools(self):
+        """Get tools with mock preferences store."""
+        return create_tools(
+            self.mock_search,
+            preferences_store=self.mock_preferences_store,
+            user_id=self.user_id,
+            chat_id=self.chat_id,
+        )
+
+    def _get_delete_tool(self):
+        """Get the delete_user_preference tool."""
+        tools = self._get_tools()
+        return next(t for t in tools if t.name == "delete_user_preference")
+
+    @pytest.mark.asyncio
+    async def test_delete_by_type_and_key(self):
+        """Test deleting preference by type and key."""
+        tool = self._get_delete_tool()
+        result = await tool.ainvoke({"rule_type": "nickname", "rule_key": "call_me"})
+        assert "偏好規則已刪除" in result
+        self.mock_preferences_store.delete_preference.assert_called_once_with(
+            user_id=self.user_id,
+            chat_id=self.chat_id,
+            rule_type="nickname",
+            rule_key="call_me",
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_by_search_value(self):
+        """Test deleting preference by searching value."""
+        tool = self._get_delete_tool()
+        result = await tool.ainvoke({"search_value": "小王爺"})
+        assert "偏好規則已刪除" in result
+        assert "小王爺" in result
+
+    @pytest.mark.asyncio
+    async def test_delete_by_search_value_partial_match(self):
+        """Test deleting preference with partial value match."""
+        tool = self._get_delete_tool()
+        result = await tool.ainvoke({"search_value": "晚安"})
+        assert "偏好規則已刪除" in result or "找到多個匹配" in result
+
+    @pytest.mark.asyncio
+    async def test_delete_search_not_found(self):
+        """Test deleting with non-matching search value."""
+        self.mock_preferences_store.get_preferences_for_user = AsyncMock(
+            return_value=[self.pref1, self.pref2, self.pref3]
+        )
+        tool = self._get_delete_tool()
+        result = await tool.ainvoke({"search_value": "不存在的值"})
+        assert "找不到匹配" in result
+
+    @pytest.mark.asyncio
+    async def test_delete_requires_parameters(self):
+        """Test delete requires either type/key or search_value."""
+        tool = self._get_delete_tool()
+        result = await tool.ainvoke({})
+        assert "Error" in result
+
+    @pytest.mark.asyncio
+    async def test_delete_multiple_matches(self):
+        """Test deleting with multiple matches shows options."""
+        # Use search term that matches multiple preferences
+        tool = self._get_delete_tool()
+        # Search for empty string should match all (or search by type which could match multiple)
+        result = await tool.ainvoke({"search_value": "pref"})  # Matches all IDs
+        assert "找到多個匹配" in result or "找不到匹配" in result
+
+
+class TestPreferenceToolsList:
+    """Tests for preference list tool."""
+
+    def setup_method(self):
+        """Set up mock preferences store."""
+        from dataclasses import dataclass
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        @dataclass
+        class MockPreference:
+            id: str
+            user_id: str
+            chat_id: str
+            rule_type: str
+            rule_key: str
+            rule_value: str
+            is_active: bool = True
+            created_at: datetime = None
+            updated_at: datetime = None
+
+            def __post_init__(self):
+                tz = ZoneInfo("Asia/Taipei")
+                self.created_at = self.created_at or datetime.now(tz)
+                self.updated_at = self.updated_at or datetime.now(tz)
+
+            def to_readable_string(self):
+                return f"ID: {self.id[:8]}\nType: {self.rule_type}\nKey: {self.rule_key}\nValue: {self.rule_value}"
+
+        self.mock_search = MagicMock()
+        self.mock_preferences_store = MagicMock()
+        self.user_id = "user_123"
+        self.chat_id = "chat_456"
+
+        self.pref1 = MockPreference(
+            id="pref-1111",
+            user_id=self.user_id,
+            chat_id=self.chat_id,
+            rule_type="nickname",
+            rule_key="call_me",
+            rule_value="小王爺",
+        )
+
+        self.mock_preferences_store.get_preferences_for_user = AsyncMock(return_value=[self.pref1])
+
+    def _get_tools(self):
+        """Get tools with mock preferences store."""
+        return create_tools(
+            self.mock_search,
+            preferences_store=self.mock_preferences_store,
+            user_id=self.user_id,
+            chat_id=self.chat_id,
+        )
+
+    @pytest.mark.asyncio
+    async def test_list_preferences(self):
+        """Test listing all preferences."""
+        tools = self._get_tools()
+        list_tool = next(t for t in tools if t.name == "get_user_preferences")
+        result = await list_tool.ainvoke({})
+        assert "preference" in result.lower()
+        assert "nickname" in result
+
+    @pytest.mark.asyncio
+    async def test_list_preferences_empty(self):
+        """Test listing preferences when empty."""
+        self.mock_preferences_store.get_preferences_for_user = AsyncMock(return_value=[])
+        tools = self._get_tools()
+        list_tool = next(t for t in tools if t.name == "get_user_preferences")
+        result = await list_tool.ainvoke({})
+        assert "No preferences" in result

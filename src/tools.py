@@ -60,12 +60,28 @@ SCHEDULE_TASK_DESCRIPTION = """設定定時任務或安排活動。使用 Cron �
 
 LIST_TASKS_DESCRIPTION = "查看目前設定的所有排程任務，包括等待中、已完成和已取消的任務。"
 
-CANCEL_TASK_DESCRIPTION = "取消一個已設定的排程任務。需要提供任務 ID（前8位即可）。"
+CANCEL_TASK_DESCRIPTION = """取消一個已設定的排程任務。
+
+  可以用以下方式指定要取消的任務：
+  - 任務 ID（完整或前8位）
+  - 任務描述（會自動搜尋匹配的任務）
+  - 任務訊息內容的關鍵字
+
+  範例：
+  - "abc12345" - 用 ID 取消
+  - "每日提醒" - 用描述取消
+  - "早安" - 用訊息內容取消
+"""
 
 UPDATE_TASK_DESCRIPTION = """修改一個已設定的排程任務。可以修改訊息內容、觸發時間（Cron 表達式）或描述。
 
   只能修改狀態為「等待中」的任務。
   至少需要提供一個要修改的欄位（message、cron 或 description）。
+
+  可以用以下方式指定要修改的任務：
+  - 任務 ID（完整或前8位）
+  - 任務描述（會自動搜尋匹配的任務）
+  - 任務訊息內容的關鍵字
 
   Cron 格式：分 時 日 月 星期
   - 0 9 * * * - 每天 9:00
@@ -94,12 +110,15 @@ GET_PREFERENCES_DESCRIPTION = "查看用戶已設定的所有個人偏好規則�
 
 DELETE_PREFERENCE_DESCRIPTION = """刪除用戶的一個個人偏好規則。
 
-  需要提供：
-  - rule_type: 規則類型（nickname, trigger, behavior, custom）
-  - rule_key: 規則鍵（例如：call_me, greeting）
+  可以用以下方式指定要刪除的規則：
+  - 規則類型和鍵：rule_type='nickname', rule_key='call_me'
+  - 規則值的關鍵字：search_value='小王爺'（會自動搜尋匹配的規則）
+
+  當只提供 search_value 時，會在所有規則中搜尋匹配的值並刪除。
 
   範例：
-  - 用戶說「不要再叫我小王爺了」→ rule_type='nickname', rule_key='call_me'
+  - 用戶說「不要再叫我小王爺了」→ search_value='小王爺' 或 rule_type='nickname', rule_key='call_me'
+  - 用戶說「取消那個晚安的規則」→ search_value='晚安'
 """
 
 SET_NICKNAME_FOR_USER_DESCRIPTION = """為群組中的另一個用戶設定暱稱。當 A 用戶想為 B 用戶設定暱稱時使用。
@@ -289,35 +308,53 @@ def create_tools(
             return scheduler.list_tasks(chat_id)
 
         @tool(description=CANCEL_TASK_DESCRIPTION)
-        async def cancel_scheduled_task(task_id: str) -> str:
+        async def cancel_scheduled_task(search: str) -> str:
             """
             取消一個排程任務。
 
             Args:
-                task_id: 任務 ID（完整或前8位）
+                search: 任務 ID（完整或前8位）、任務描述或訊息內容的關鍵字
             """
-            # Only search tasks belonging to this chat (isolation)
-            matching_tasks = [
+            # Only search tasks belonging to this chat (isolation) and still pending
+            chat_tasks = [
                 t
                 for t in scheduler.tasks.values()
-                if t.chat_id == chat_id and (t.id.startswith(task_id) or t.id[:8] == task_id[:8])
+                if t.chat_id == chat_id and t.status == "pending"
             ]
 
+            # Try to find by ID first
+            matching_tasks = [
+                t for t in chat_tasks if t.id.startswith(search) or t.id[:8] == search[:8]
+            ]
+
+            # If no ID match, try to find by description or message content
             if not matching_tasks:
-                return f"Task not found: {task_id}"
+                search_lower = search.lower()
+                matching_tasks = [
+                    t
+                    for t in chat_tasks
+                    if (t.description and search_lower in t.description.lower())
+                    or search_lower in t.message.lower()
+                ]
+
+            if not matching_tasks:
+                return f"找不到任務：{search}"
 
             if len(matching_tasks) > 1:
-                return "Multiple matching tasks found, please provide a more complete ID"
+                task_list = "\n".join(
+                    f"  - {t.id[:8]}: {t.description or t.message[:30]}" for t in matching_tasks[:5]
+                )
+                return f"找到多個匹配的任務，請提供更精確的搜尋條件：\n{task_list}"
 
             task = matching_tasks[0]
             if await scheduler.cancel_task(task.id):
-                return f"Task cancelled: {task.description or task.id[:8]}"
+                return f"任務已取消：{task.description or task.id[:8]}"
             else:
-                return "Cannot cancel task (may be completed or already cancelled)"
+                return "無法取消任務（可能已完成或已取消）"
 
         @tool(description=UPDATE_TASK_DESCRIPTION)
         async def update_scheduled_task(
-            task_id: str,
+            search: str,
             message: str | None = None,
             cron: str | None = None,
             description: str | None = None,
@@ -326,7 +363,7 @@ def create_tools(
             修改一個排程任務的訊息、時間或描述。
 
             Args:
-                task_id: 任務 ID（完整或前8位）
+                search: 任務 ID（完整或前8位）、任務描述或訊息內容的關鍵字
                 message: 新的訊息內容（可選）
                 cron: 新的 Cron 表達式（可選）
                 description: 新的任務描述（可選）
@@ -335,18 +372,36 @@ def create_tools(
             if message is None and cron is None and description is None:
                 return "Error: 至少需要提供一個要修改的欄位（message、cron 或 description）"
 
-            # Only search tasks belonging to this chat (isolation)
-            matching_tasks = [
+            # Only search tasks belonging to this chat (isolation) and still pending
+            chat_tasks = [
                 t
                 for t in scheduler.tasks.values()
-                if t.chat_id == chat_id and (t.id.startswith(task_id) or t.id[:8] == task_id[:8])
+                if t.chat_id == chat_id and t.status == "pending"
             ]
 
+            # Try to find by ID first
+            matching_tasks = [
+                t for t in chat_tasks if t.id.startswith(search) or t.id[:8] == search[:8]
+            ]
+
+            # If no ID match, try to find by description or message content
             if not matching_tasks:
-                return f"Task not found: {task_id}"
+                search_lower = search.lower()
+                matching_tasks = [
+                    t
+                    for t in chat_tasks
+                    if (t.description and search_lower in t.description.lower())
+                    or search_lower in t.message.lower()
+                ]
+
+            if not matching_tasks:
+                return f"找不到任務：{search}"
 
             if len(matching_tasks) > 1:
-                return "Multiple matching tasks found, please provide a more complete ID"
+                task_list = "\n".join(
+                    f"  - {t.id[:8]}: {t.description or t.message[:30]}" for t in matching_tasks[:5]
+                )
+                return f"找到多個匹配的任務，請提供更精確的搜尋條件：\n{task_list}"
 
             task = matching_tasks[0]
 
@@ -368,9 +423,9 @@ def create_tools(
                 return f"Error: {e}"
 
             if updated_task:
-                return f"Task updated!\n\n{updated_task.to_readable_string()}"
+                return f"任務已更新！\n\n{updated_task.to_readable_string()}"
             else:
-                return "Cannot update task (may be completed or cancelled)"
+                return "無法更新任務（可能已完成或已取消）"
 
         tools.extend(
             [schedule_task, list_scheduled_tasks, cancel_scheduled_task, update_scheduled_task]
@@ -430,30 +485,73 @@ def create_tools(
 
         @tool(description=DELETE_PREFERENCE_DESCRIPTION)
         async def delete_user_preference(
-            rule_type: Literal["nickname", "trigger", "behavior", "custom"],
-            rule_key: str,
+            rule_type: Literal["nickname", "trigger", "behavior", "custom"] | None = None,
+            rule_key: str | None = None,
+            search_value: str | None = None,
         ) -> str:
             """
             刪除用戶在此聊天室的一個個人偏好規則。
 
             Args:
-                rule_type: 規則類型（nickname, trigger, behavior, custom）
-                rule_key: 規則鍵（例如：call_me, greeting）
+                rule_type: 規則類型（nickname, trigger, behavior, custom）（可選）
+                rule_key: 規則鍵（例如：call_me, greeting）（可選）
+                search_value: 規則值的關鍵字，用於搜尋匹配的規則（可選）
             """
             if not chat_id:
                 return "Error: Cannot delete preference without chat context"
 
-            deleted = await preferences_store.delete_preference(
-                user_id=user_id,
-                chat_id=chat_id,
-                rule_type=rule_type,
-                rule_key=rule_key,
-            )
+            # If both rule_type and rule_key are provided, use direct delete
+            if rule_type and rule_key:
+                deleted = await preferences_store.delete_preference(
+                    user_id=user_id,
+                    chat_id=chat_id,
+                    rule_type=rule_type,
+                    rule_key=rule_key,
+                )
+                if deleted:
+                    return f"偏好規則已刪除：{rule_type}/{rule_key}"
+                else:
+                    return f"找不到偏好規則：{rule_type}/{rule_key}"
 
-            if deleted:
-                return f"Preference deleted: {rule_type}/{rule_key}"
-            else:
-                return f"Preference not found: {rule_type}/{rule_key}"
+            # If search_value is provided, search for matching preferences
+            if search_value:
+                prefs = await preferences_store.get_preferences_for_user(
+                    user_id=user_id,
+                    chat_id=chat_id,
+                    active_only=True,
+                )
+
+                search_lower = search_value.lower()
+                matching_prefs = [
+                    p
+                    for p in prefs
+                    if search_lower in p.rule_value.lower()
+                    or search_lower in p.rule_key.lower()
+                    or search_lower in p.rule_type.lower()
+                ]
+
+                if not matching_prefs:
+                    return f"找不到匹配的偏好規則：{search_value}"
+
+                if len(matching_prefs) > 1:
+                    pref_list = "\n".join(
+                        f"  - {p.rule_type}/{p.rule_key}: {p.rule_value}" for p in matching_prefs
+                    )
+                    return f"找到多個匹配的規則，請提供更精確的搜尋條件：\n{pref_list}"
+
+                pref = matching_prefs[0]
+                deleted = await preferences_store.delete_preference(
+                    user_id=user_id,
+                    chat_id=chat_id,
+                    rule_type=pref.rule_type,
+                    rule_key=pref.rule_key,
+                )
+                if deleted:
+                    return f"偏好規則已刪除：{pref.rule_type}/{pref.rule_key} = {pref.rule_value}"
+                else:
+                    return "刪除失敗"
+
+            return "Error: 請提供 rule_type 和 rule_key，或者提供 search_value 來搜尋"
 
         tools.extend([set_user_preference, get_user_preferences, delete_user_preference])
 

@@ -360,21 +360,26 @@ def _get_message_data(context: ChatContext) -> tuple[str, str, str, dict]:
 
 
 async def _get_square_member(context: ChatContext) -> dict | None:
-    """Get the Square member who sent the message."""
+    """Get the Square member who sent the message.
+
+    Uses the getSquareMember API directly for efficiency and reliability,
+    rather than fetching all chat members and searching through them.
+    """
     if not context.event or context.chat_type != "square":
         return None
 
-    message_to, message_from, _, _ = _get_message_data(context)
+    _, message_from, _, _ = _get_message_data(context)
 
-    chat = await context.client.get_square_chat(message_to)
-    members = await chat.get_members()
-
-    for member in members:
-        # Try numeric field ID first (1), then string key for compatibility
-        member_mid = member.get(_SQUARE_MEMBER_FIELD_MID) or member.get("squareMemberMid")
-        if member_mid == message_from:
-            return member
-    return None
+    try:
+        # Use getSquareMember API directly - more efficient than fetching all members
+        # GetSquareMemberResponse: field 1 = squareMember (SquareMember struct)
+        response = await context.client.base.square.get_square_member(message_from)
+        # Extract the SquareMember from the response
+        square_member = response.get(1) or response.get("squareMember")
+        return square_member
+    except Exception as e:
+        logger.warning(f"_get_square_member: API call failed for {message_from[:20]}...: {e}")
+        return None
 
 
 async def _add_square_member(context: ChatContext) -> None:
