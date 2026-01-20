@@ -1,6 +1,7 @@
 """Helper functions for the LangGraph workflow."""
 
 import base64
+import re
 from typing import TYPE_CHECKING, Literal
 
 import httpx
@@ -949,6 +950,10 @@ async def chat(
             break
 
     clean_answer = answer.replace(f"{bot_name}:", "").replace(f"{bot_name}：", "").strip()
+
+    # Filter out member ID suffixes (e.g., "#abc123") that may leak into the response
+    # The ID suffix format is "#" followed by 6 alphanumeric characters
+    clean_answer = re.sub(r"#[a-zA-Z0-9]{6}\b", "", clean_answer)
 
     logger.info(f"chat: response='{clean_answer[:80]}...'")
 
