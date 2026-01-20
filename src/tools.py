@@ -104,15 +104,13 @@ DELETE_PREFERENCE_DESCRIPTION = """刪除用戶的一個個人偏好規則。
 
 SET_NICKNAME_FOR_USER_DESCRIPTION = """為群組中的另一個用戶設定暱稱。當 A 用戶想為 B 用戶設定暱稱時使用。
 
-  使用此工具時，必須提供目標用戶的識別符 (target_user_identifier)。
-
-  目標用戶識別符格式：
-  - 格式為「名稱#ID前6位」，例如「小明#abc123」
-  - 可以在聊天記錄中找到用戶的識別符
+  使用此工具時，必須提供目標用戶的名字 (target_user_name)。
 
   範例：
-  - 用戶說「叫小明#abc123小王爺」→ target_user_identifier='小明#abc123', nickname='小王爺'
-  - 用戶說「以後叫那個 John#xyz789 約翰大帝」→ target_user_identifier='John#xyz789', nickname='約翰大帝'
+  - 用戶說「叫小明小王爺」→ target_user_name='小明', nickname='小王爺'
+  - 用戶說「以後叫那個 John 約翰大帝」→ target_user_name='John', nickname='約翰大帝'
+
+  如果群組中有多個同名用戶，工具會返回錯誤，需要用戶提供更多資訊來區分。
 
   注意：只有暱稱規則可以為其他用戶設定，其他規則（trigger, behavior, custom）只能為自己設定。
 """
@@ -464,65 +462,40 @@ def create_tools(
 
             @tool(description=SET_NICKNAME_FOR_USER_DESCRIPTION)
             async def set_nickname_for_user(
-                target_user_identifier: str,
+                target_user_name: str,
                 nickname: str,
             ) -> str:
                 """
                 為群組中的另一個用戶設定暱稱。
 
                 Args:
-                    target_user_identifier: 目標用戶的識別符（格式為「名稱#ID前6位」）
+                    target_user_name: 目標用戶的名字
                     nickname: 要設定的暱稱
                 """
                 if not chat_id:
                     return "Error: Cannot save preference without chat context"
 
-                # Parse the target user identifier to find the user ID
-                # Format: "DisplayName#abc123" where abc123 is the first 6 chars of member ID
-                if "#" not in target_user_identifier:
+                # Find matching members by name (case-insensitive)
+                target_name = target_user_name.strip()
+                matching_members = [m for m in members if m.name.lower() == target_name.lower()]
+
+                if not matching_members:
+                    # Try partial match as fallback
+                    matching_members = [m for m in members if target_name.lower() in m.name.lower()]
+
+                if not matching_members:
+                    available_names = ", ".join(m.name for m in members[:10])
+                    suffix = "..." if len(members) > 10 else ""
                     return (
-                        "Error: 無效的用戶識別符格式。"
-                        "請使用「名稱#ID前6位」的格式，例如「小明#abc123」"
+                        f"Error: 找不到用戶「{target_name}」。"
+                        f"群組中的用戶：{available_names}{suffix}"
                     )
 
-                parts = target_user_identifier.rsplit("#", 1)
-                if len(parts) != 2:
-                    return (
-                        "Error: 無效的用戶識別符格式。"
-                        "請使用「名稱#ID前6位」的格式，例如「小明#abc123」"
-                    )
+                if len(matching_members) > 1:
+                    member_list = ", ".join(m.name for m in matching_members)
+                    return f"Error: 找到多個符合的用戶：{member_list}。請提供更精確的名字來區分。"
 
-                target_name, short_id = parts
-                short_id = short_id.lower()
-
-                # Find the member with matching short ID
-                target_member = None
-                for member in members:
-                    if member.id[:6].lower() == short_id:
-                        target_member = member
-                        break
-
-                if not target_member:
-                    # Try partial match on display name as fallback
-                    matching_members = [
-                        m
-                        for m in members
-                        if m.name.lower() == target_name.lower()
-                        or m.id[:6].lower().startswith(short_id[:3])
-                    ]
-                    if len(matching_members) == 1:
-                        target_member = matching_members[0]
-                    elif len(matching_members) > 1:
-                        member_list = ", ".join(f"{m.name}#{m.id[:6]}" for m in matching_members)
-                        return (
-                            f"Error: 找到多個符合的用戶。請提供更完整的識別符。"
-                            f"可能的用戶：{member_list}"
-                        )
-                    else:
-                        return (
-                            f"Error: 找不到用戶「{target_user_identifier}」。"
-                            "請確認該用戶在此群組中，並使用正確的識別符格式。"
-                        )
+                target_member = matching_members[0]
 
                 # Set the nickname preference for the target user
                 try:
@@ -534,8 +507,8 @@ def create_tools(
                         rule_value=nickname,
                     )
                     return (
-                        f"已為用戶 {target_member.name}#{target_member.id[:6]} "
-                        f"設定暱稱「{nickname}」\n\n{pref.to_readable_string()}"
+                        f"已為用戶「{target_member.name}」設定暱稱「{nickname}」\n\n"
+                        f"{pref.to_readable_string()}"
                     )
                 except Exception as e:
                     return f"Error: {e}"

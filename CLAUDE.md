@@ -190,8 +190,8 @@ vanilla/
 - `get_user_preferences`: List all preferences for the current user (requires preferences_store)
 - `delete_user_preference`: Delete a preference by type and key (requires preferences_store)
 - `set_nickname_for_user`: Set a nickname for another user in the chat (requires preferences_store, members)
-  - Parameters: `target_user_identifier`, `nickname`
-  - Target user identifier format: `DisplayName#abc123` (name + first 6 chars of user ID)
+  - Parameters: `target_user_name`, `nickname`
+  - Matches users by display name (case-insensitive)
   - Allows User A to set a nickname for User B
 - Factory function `create_tools(search, scheduler?, chat_id?, preferences_store?, user_id?, members?)` for tool instantiation
 
@@ -225,9 +225,8 @@ vanilla/
 
 - Per-chat conversation state via `SquareData` dataclass
 - Per-member tracking with name, ID, and message history
-- **Member identifier format**: Messages include `DisplayName#abc123` format for unique user identification
-  - The `#abc123` suffix is the first 6 characters of the user's LINE ID
-  - This helps distinguish users with the same display name in multi-user chats
+- **Message format**: Messages use simple `DisplayName: text` format for clear LLM understanding
+  - Example: `小明: 今天天氣如何？`
 - Bot ID tracking for mention and reply detection
 - Async PostgreSQL checkpointer for state persistence
 

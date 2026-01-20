@@ -58,8 +58,6 @@ def parse_pending_sticker(text: str) -> tuple[str, str] | None:
         return None
 
     # Extract content between [傳送了貼圖: PENDING:...] and ]
-    import re
-
     pattern = rf"\[傳送了貼圖: {PENDING_STICKER_PREFIX}([^:\]]+):([^\]]*)\]"
     match = re.search(pattern, text)
     if match:
@@ -392,27 +390,48 @@ async def _add_square_member(context: ChatContext) -> None:
 
     # Check if member is already cached (skip API call)
     if chat_data.is_member_cached(message_from):
+        logger.debug(f"_add_square_member: member {message_from[:20]}... already cached")
         return
 
     square_member = await _get_square_member(context)
-    if not square_member:
-        return
 
-    # Try numeric field ID first (3), then string key for compatibility
-    display_name = square_member.get(_SQUARE_MEMBER_FIELD_DISPLAY_NAME) or square_member.get(
-        "displayName", ""
-    )
+    # Get display name from API response, or use member ID as fallback
+    if square_member:
+        # Try numeric field ID first (3), then string key for compatibility
+        display_name = square_member.get(_SQUARE_MEMBER_FIELD_DISPLAY_NAME) or square_member.get(
+            "displayName", ""
+        )
+        logger.debug(
+            f"_add_square_member: got display_name='{display_name}' for {message_from[:20]}..."
+        )
+    else:
+        # Fallback to member ID if API call failed
+        display_name = ""
+        logger.warning(f"_add_square_member: failed to get member info for {message_from[:20]}...")
+
+    # Use member ID as display name if empty
+    if not display_name:
+        display_name = message_from
+        logger.warning(
+            f"_add_square_member: using member ID as fallback name for {message_from[:20]}..."
+        )
 
     # Find existing member
     for member in chat_data.members:
         if member.id == message_from:
             member.name = display_name
             chat_data.update_member_cache_time()
+            logger.debug(
+                f"_add_square_member: updated existing member {message_from[:20]}... name='{display_name}'"
+            )
             return
 
     # Add new member
     chat_data.members.append(Member(id=message_from, name=display_name))
     chat_data.update_member_cache_time()
+    logger.debug(
+        f"_add_square_member: added new member {message_from[:20]}... name='{display_name}'"
+    )
 
 
 # =============================================================================
@@ -447,27 +466,46 @@ async def _add_talk_member(context: ChatContext) -> None:
 
     # Check if member is already cached (skip API call)
     if chat_data.is_member_cached(message_from):
+        logger.debug(f"_add_talk_member: member {message_from[:20]}... already cached")
         return
 
     talk_member = await _get_talk_member(context)
-    if not talk_member:
-        return
 
-    # Try numeric field ID first (22), then string key for compatibility
-    display_name = talk_member.get(_CONTACT_FIELD_DISPLAY_NAME) or talk_member.get(
-        "displayName", message_from
-    )
+    # Get display name from API response, or use member ID as fallback
+    if talk_member:
+        # Try numeric field ID first (22), then string key for compatibility
+        display_name = talk_member.get(_CONTACT_FIELD_DISPLAY_NAME) or talk_member.get(
+            "displayName", ""
+        )
+        logger.debug(
+            f"_add_talk_member: got display_name='{display_name}' for {message_from[:20]}..."
+        )
+    else:
+        # Fallback to member ID if API call failed
+        display_name = ""
+        logger.warning(f"_add_talk_member: failed to get member info for {message_from[:20]}...")
+
+    # Use member ID as display name if empty
+    if not display_name:
+        display_name = message_from
+        logger.warning(
+            f"_add_talk_member: using member ID as fallback name for {message_from[:20]}..."
+        )
 
     # Find existing member
     for member in chat_data.members:
         if member.id == message_from:
             member.name = display_name
             chat_data.update_member_cache_time()
+            logger.debug(
+                f"_add_talk_member: updated existing member {message_from[:20]}... name='{display_name}'"
+            )
             return
 
     # Add new member
     chat_data.members.append(Member(id=message_from, name=display_name))
     chat_data.update_member_cache_time()
+    logger.debug(f"_add_talk_member: added new member {message_from[:20]}... name='{display_name}'")
 
 
 # =============================================================================
@@ -491,20 +529,25 @@ def _add_chat_message(context: ChatContext) -> None:
     bot_name = context.bot_name
     message_to, message_from, message_text, raw = _get_message_data(context)
 
-    # Find member name and create a unique identifier
-    # Format: "DisplayName#abc123" where abc123 is the first 6 chars of the member ID
-    # This helps distinguish between users with the same display name
+    # Find member name
+    # Format: "DisplayName: 訊息內容" - simple and clear for LLM understanding
     member_name = message_from
-    short_member_id = message_from[:6] if message_from else ""
     chat_data = context.chats.get(message_to)
+    member_found = False
     if chat_data:
         for member in chat_data.members:
             if member.id == message_from:
                 member_name = member.name
+                member_found = True
                 break
 
-    # Combine display name with short ID for unique identification
-    member_identifier = f"{member_name}#{short_member_id}"
+    if not member_found:
+        logger.warning(
+            f"_add_chat_message: member {message_from[:20]}... not found in members list, "
+            f"using raw ID as name. Members count: {len(chat_data.members) if chat_data else 0}"
+        )
+
+    logger.debug(f"_add_chat_message: formatted message from '{member_name}'")
 
     # Handle different content types
     content_type = _get_content_type(raw)
@@ -539,7 +582,7 @@ def _add_chat_message(context: ChatContext) -> None:
             text = "[訊息已加密，無法讀取內容]"
             logger.warning("E2EE message could not be decrypted - using placeholder text")
 
-    new_message = HumanMessage(content=f"{member_identifier}: {text}")
+    new_message = HumanMessage(content=f"{member_name}: {text}")
 
     # Extract message ID using both numeric field ID and string key
     message_id = raw.get(_MSG_FIELD_ID) or raw.get("id", "")
@@ -950,10 +993,6 @@ async def chat(
             break
 
     clean_answer = answer.replace(f"{bot_name}:", "").replace(f"{bot_name}：", "").strip()
-
-    # Filter out member ID suffixes (e.g., "#abc123") that may leak into the response
-    # The ID suffix format is "#" followed by 6 alphanumeric characters
-    clean_answer = re.sub(r"#[a-zA-Z0-9]{6}\b", "", clean_answer)
 
     logger.info(f"chat: response='{clean_answer[:80]}...'")
 
